@@ -1,0 +1,25 @@
+-- Minimal authored bind_stalker.script fixture for patch-engine tests.
+function actor_binder:net_spawn(data)
+death_manager.init_drop_settings()
+    local preserved_spawn_state = true
+end
+
+function actor_binder:net_destroy()
+self.bCheckStart = false
+end
+
+function actor_binder:use_inventory_item(obj)
+local obj_section = obj:section()
+end
+
+function actor_binder:hit_callback(obj, amount, local_direction, who, bone_index)
+local hitted_by = who and who:id()
+end
+
+function actor_binder:update(delta)
+object_binder.update(self, delta)
+end
+
+function actor_binder:unrelated()
+death_manager.init_drop_settings()
+end

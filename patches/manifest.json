@@ -1,0 +1,58 @@
+{
+  "marker": "soc_sleeping_bag",
+  "sharedFiles": [
+    {
+      "path": "gamedata/config/system.ltx",
+      "archivePath": "config/system.ltx",
+      "patches": [
+        {
+          "kind": "line",
+          "anchor": "#include \"misc\\items.ltx\"",
+          "position": "After",
+          "line": "#include \"misc\\soc_sleeping_bag.ltx\" ; soc_sleeping_bag"
+        }
+      ]
+    },
+    {
+      "path": "gamedata/scripts/bind_stalker.script",
+      "archivePath": "scripts/bind_stalker.script",
+      "patches": [
+        {
+          "kind": "luaFunction",
+          "function": "function actor_binder:net_spawn(data)",
+          "anchor": "death_manager.init_drop_settings()",
+          "position": "After",
+          "line": "    soc_sleeping_bag.on_actor_net_spawn() -- soc_sleeping_bag"
+        },
+        {
+          "kind": "luaFunction",
+          "function": "function actor_binder:net_destroy()",
+          "anchor": "self.bCheckStart = false",
+          "position": "After",
+          "line": "    soc_sleeping_bag.on_actor_net_destroy() -- soc_sleeping_bag"
+        },
+        {
+          "kind": "luaFunction",
+          "function": "function actor_binder:use_inventory_item(obj)",
+          "anchor": "local obj_section = obj:section()",
+          "position": "After",
+          "line": "    soc_sleeping_bag.on_item_use(obj) -- soc_sleeping_bag"
+        },
+        {
+          "kind": "luaFunction",
+          "function": "function actor_binder:hit_callback(obj, amount, local_direction, who, bone_index)",
+          "anchor": "local hitted_by = who and who:id()",
+          "position": "After",
+          "line": "    soc_sleeping_bag.on_actor_hit() -- soc_sleeping_bag"
+        },
+        {
+          "kind": "luaFunction",
+          "function": "function actor_binder:update(delta)",
+          "anchor": "object_binder.update(self, delta)",
+          "position": "After",
+          "line": "    soc_sleeping_bag.update(delta) -- soc_sleeping_bag"
+        }
+      ]
+    }
+  ]
+}
