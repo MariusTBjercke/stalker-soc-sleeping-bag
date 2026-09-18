@@ -37,8 +37,30 @@ function Resolve-ConfinedPath {
     $separator = [string][IO.Path]::DirectorySeparatorChar
     $rootPrefix = if ($rootPath.EndsWith($separator)) { $rootPath } else { $rootPath + $separator }
 
+    if ([string]::Equals($candidatePath, $rootPath, [StringComparison]::OrdinalIgnoreCase)) {
+        return $rootPath
+    }
     if (-not $candidatePath.StartsWith($rootPrefix, [StringComparison]::OrdinalIgnoreCase)) {
         throw "Resolved path is outside the declared root: $RelativePath"
+    }
+
+    $traversedPath = $rootPath
+    foreach ($segment in ($RelativePath -split '[\\/]')) {
+        if (($segment.Length -eq 0) -or ($segment -eq '.')) {
+            continue
+        }
+        if ($segment -eq '..') {
+            $traversedPath = Split-Path -Parent $traversedPath
+            continue
+        }
+
+        $traversedPath = Join-Path $traversedPath $segment
+        if (Test-Path -LiteralPath $traversedPath) {
+            $item = Get-Item -LiteralPath $traversedPath -Force
+            if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+                throw "Resolved path crosses a reparse point outside the declared root: $RelativePath"
+            }
+        }
     }
 
     return $candidatePath

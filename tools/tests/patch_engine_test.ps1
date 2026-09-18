@@ -71,6 +71,24 @@ Assert-Throws -Action { Add-MarkedLineInFunction -Text $duplicateFunction -Funct
 $declaredRoot = Join-Path $PSScriptRoot 'fixtures\declared-root'
 Assert-Throws -Action { Resolve-ConfinedPath -Root $declaredRoot -RelativePath '..\escaped.txt' } -Pattern 'outside' -Message 'A path resolved outside its declared root must throw.'
 
+$reparseTestRoot = Join-Path ([IO.Path]::GetTempPath()) ('soc-sleeping-bag-path-test-' + [guid]::NewGuid().ToString('N'))
+$reparseDeclaredRoot = Join-Path $reparseTestRoot 'root'
+$reparseOutsideRoot = Join-Path $reparseTestRoot 'outside'
+try {
+    New-Item -ItemType Directory -Path $reparseDeclaredRoot -Force | Out-Null
+    New-Item -ItemType Directory -Path $reparseOutsideRoot -Force | Out-Null
+    $escapeJunction = Join-Path $reparseDeclaredRoot 'escape'
+    New-Item -ItemType Junction -Path $escapeJunction -Target $reparseOutsideRoot | Out-Null
+
+    Assert-Throws -Action { Resolve-ConfinedPath -Root $reparseDeclaredRoot -RelativePath 'escape\child.txt' } -Pattern 'outside' -Message 'A child path through an existing junction must throw.'
+    Assert-Equal -Expected ([IO.Path]::GetFullPath($reparseDeclaredRoot)) -Actual (Resolve-ConfinedPath -Root $reparseDeclaredRoot -RelativePath '.') -Message 'The declared root itself must be a valid confined path.'
+}
+finally {
+    if (Test-Path -LiteralPath $reparseTestRoot) {
+        Remove-Item -LiteralPath $reparseTestRoot -Recurse -Force
+    }
+}
+
 $blockSource = [String]::Join("`r`n", @('<root>', '</root>', ''))
 $block = Add-MarkedBlock -Text $blockSource -Anchor '</root>' -Lines @('  <transition />') -BeginMarker '<!-- soc_sleeping_bag begin -->' -EndMarker '<!-- soc_sleeping_bag end -->' -Position Before
 $replacedBlock = Add-MarkedBlock -Text $block -Anchor '</root>' -Lines @('  <replacement />') -BeginMarker '<!-- soc_sleeping_bag begin -->' -EndMarker '<!-- soc_sleeping_bag end -->' -Position Before
@@ -80,5 +98,14 @@ Assert-Equal -Expected $blockSource -Actual (Remove-MarkedBlock -Text $replacedB
 Assert-Throws -Action { Remove-MarkedBlock -Text '<root />' -BeginMarker '<!-- soc_sleeping_bag begin -->' -EndMarker '<!-- soc_sleeping_bag end -->' } -Pattern 'exactly one' -Message 'Missing block markers must throw.'
 $duplicateBegin = [String]::Join("`r`n", @('<!-- soc_sleeping_bag begin -->', '<!-- soc_sleeping_bag begin -->', '<!-- soc_sleeping_bag end -->', ''))
 Assert-Throws -Action { Remove-MarkedBlock -Text $duplicateBegin -BeginMarker '<!-- soc_sleeping_bag begin -->' -EndMarker '<!-- soc_sleeping_bag end -->' } -Pattern 'exactly one' -Message 'Duplicate block markers must throw.'
+
+$orphanBegin = [String]::Join("`r`n", @('<root>', '<!-- soc_sleeping_bag begin -->', '</root>', ''))
+$orphanEnd = [String]::Join("`r`n", @('<root>', '<!-- soc_sleeping_bag end -->', '</root>', ''))
+$reversedMarkers = [String]::Join("`r`n", @('<root>', '<!-- soc_sleeping_bag end -->', '<!-- soc_sleeping_bag begin -->', '</root>', ''))
+$duplicateEnd = [String]::Join("`r`n", @('<root>', '<!-- soc_sleeping_bag begin -->', '<!-- soc_sleeping_bag end -->', '<!-- soc_sleeping_bag end -->', '</root>', ''))
+foreach ($malformedBlock in @($orphanBegin, $orphanEnd, $reversedMarkers, $duplicateEnd)) {
+    Assert-Throws -Action { Remove-MarkedBlock -Text $malformedBlock -BeginMarker '<!-- soc_sleeping_bag begin -->' -EndMarker '<!-- soc_sleeping_bag end -->' } -Pattern 'ordered begin and end marker pair' -Message 'Malformed block markers must prevent removal.'
+    Assert-Throws -Action { Add-MarkedBlock -Text $malformedBlock -Anchor '</root>' -Lines @('  <replacement />') -BeginMarker '<!-- soc_sleeping_bag begin -->' -EndMarker '<!-- soc_sleeping_bag end -->' -Position Before } -Pattern 'ordered begin and end marker pair' -Message 'Malformed block markers must prevent replacement.'
+}
 
 Write-Output 'PASS: semantic patch primitives'
