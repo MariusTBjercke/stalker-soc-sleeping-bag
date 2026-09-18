@@ -366,6 +366,59 @@ function Get-GameIdentity {
     }
 }
 
+function Get-GameFileText {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string] $Path)
+
+    $rawBytes = [IO.File]::ReadAllBytes($Path)
+    if (($rawBytes.Length -ge 3) -and ($rawBytes[0] -eq 0xEF) -and ($rawBytes[1] -eq 0xBB) -and ($rawBytes[2] -eq 0xBF)) {
+        return [pscustomobject]@{
+            Text = [Text.Encoding]::UTF8.GetString($rawBytes, 3, $rawBytes.Length - 3)
+            Encoding = [Text.UTF8Encoding]::new($true)
+        }
+    }
+    if (($rawBytes.Length -ge 2) -and ($rawBytes[0] -eq 0xFF) -and ($rawBytes[1] -eq 0xFE)) {
+        return [pscustomobject]@{
+            Text = [Text.Encoding]::Unicode.GetString($rawBytes, 2, $rawBytes.Length - 2)
+            Encoding = [Text.UnicodeEncoding]::new($false, $true)
+        }
+    }
+
+    if ([Type]::GetType('System.Text.CodePagesEncodingProvider, System.Text.Encoding.CodePages')) {
+        [Text.Encoding]::RegisterProvider([Text.CodePagesEncodingProvider]::Instance)
+    }
+
+    try {
+        $strictUtf8 = [Text.UTF8Encoding]::new($false, $true)
+        return [pscustomobject]@{
+            Text = $strictUtf8.GetString($rawBytes)
+            Encoding = [Text.UTF8Encoding]::new($false)
+        }
+    }
+    catch [System.Text.DecoderFallbackException] {
+        $legacyEncoding = [Text.Encoding]::GetEncoding(1251)
+        return [pscustomobject]@{
+            Text = $legacyEncoding.GetString($rawBytes)
+            Encoding = $legacyEncoding
+        }
+    }
+}
+
+function Set-GameFileText {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string] $Path,
+        [Parameter(Mandatory)][AllowEmptyString()][string] $Text,
+        [Text.Encoding] $Encoding = ([Text.UTF8Encoding]::new($false))
+    )
+
+    $parent = Split-Path -Parent $Path
+    if (-not [string]::IsNullOrWhiteSpace($parent)) {
+        New-Item -ItemType Directory -Path $parent -Force | Out-Null
+    }
+    [IO.File]::WriteAllText($Path, $Text, $Encoding)
+}
+
 function Get-EffectiveGameFile {
     [CmdletBinding()]
     param(
@@ -379,8 +432,10 @@ function Get-EffectiveGameFile {
     $resolvedGameDir = [IO.Path]::GetFullPath($GameDir)
     $loosePath = Resolve-ConfinedPath -Root $resolvedGameDir -RelativePath $LooseRelativePath
     if (Test-Path -LiteralPath $loosePath -PathType Leaf) {
+        $decoded = Get-GameFileText -Path $loosePath
         return [pscustomobject]@{
-            Text = [IO.File]::ReadAllText($loosePath)
+            Text = $decoded.Text
+            Encoding = $decoded.Encoding
             Origin = 'loose'
             BaseHash = Get-Sha256 -Path $loosePath
             SourcePath = $loosePath
@@ -408,8 +463,10 @@ function Get-EffectiveGameFile {
         throw "Archive extraction for '$ArchiveRelativePath' must produce exactly one file; found $($candidates.Count)."
     }
 
+    $decoded = Get-GameFileText -Path $candidates[0].FullName
     return [pscustomobject]@{
-        Text = [IO.File]::ReadAllText($candidates[0].FullName)
+        Text = $decoded.Text
+        Encoding = $decoded.Encoding
         Origin = 'archive'
         BaseHash = Get-Sha256 -Path $candidates[0].FullName
         SourcePath = $archivePath + '::' + $ArchiveRelativePath

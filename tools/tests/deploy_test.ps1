@@ -7,13 +7,20 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'testlib.ps1')
 
 $sourceRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
+. (Join-Path $sourceRoot 'tools\common.ps1')
 $deploySource = Join-Path $sourceRoot 'tools\deploy.ps1'
 if (-not (Test-Path -LiteralPath $deploySource -PathType Leaf)) {
     throw 'RED: tools/deploy.ps1 does not exist.'
 }
 
 $testRoot = Join-Path ([IO.Path]::GetTempPath()) ('soc-sleeping-bag-deploy-tests-' + [guid]::NewGuid().ToString('N'))
-$powershellExe = Join-Path $PSHOME 'powershell.exe'
+$powershellExe = if (Test-Path -LiteralPath (Join-Path $PSHOME 'pwsh.exe')) {
+    Join-Path $PSHOME 'pwsh.exe'
+} elseif (Test-Path -LiteralPath (Join-Path $PSHOME 'powershell.exe')) {
+    Join-Path $PSHOME 'powershell.exe'
+} else {
+    (Get-Process -Id $PID).Path
+}
 
 $systemFixture = [String]::Join("`r`n", @(
         '; Independently authored deployment fixture.',
@@ -268,6 +275,54 @@ try {
     Assert-Equal -Expected 'owned' -Actual $ownedRecord[0].ownership -Message 'Owned ownership must be recorded.'
     Assert-Match -Text $systemRecord[0].baseHash -Pattern '^[0-9a-f]{64}$' -Message 'Base hashes must be recorded.'
     Assert-Match -Text $systemRecord[0].installedHash -Pattern '^[0-9a-f]{64}$' -Message 'Installed hashes must be recorded.'
+
+    $fixture = New-DeploymentFixture -Name 'missing-version'
+    Remove-Item -LiteralPath (Join-Path $fixture.Repo 'VERSION') -Force
+    Assert-DeployFailedWithoutWrites -Fixture $fixture -Pattern 'VERSION file not found'
+
+    $fixture = New-DeploymentFixture -Name 'non-ascii-preservation'
+    $legacyBytes = [byte[]]@(
+        0x3b, 0x20, 0xe9, 0x0d, 0x0a,
+        0x23, 0x69, 0x6e, 0x63, 0x6c, 0x75, 0x64, 0x65, 0x20, 0x22, 0x6d, 0x69, 0x73, 0x63, 0x5c, 0x69, 0x74, 0x65, 0x6d, 0x73, 0x2e, 0x6c, 0x74, 0x78, 0x22, 0x0d, 0x0a
+    )
+    [IO.File]::WriteAllBytes((Join-Path $fixture.Game 'gamedata\config\system.ltx'), $legacyBytes)
+    $result = Invoke-Deploy -Fixture $fixture -Apply
+    Assert-Equal -Expected 0 -Actual $result.ExitCode -Message "Non-ASCII apply failed. Output: $($result.Output)"
+    $installedBytes = [IO.File]::ReadAllBytes((Join-Path $fixture.Game 'gamedata\config\system.ltx'))
+    Assert-True -Condition ($installedBytes -contains 0xe9) -Message 'Non-ASCII legacy byte 0xE9 must be preserved in patched file.'
+    $decodedText = (Get-GameFileText -Path (Join-Path $fixture.Game 'gamedata\config\system.ltx')).Text
+    Assert-True -Condition (-not $decodedText.Contains([string][char]0xfffd)) -Message 'Non-ASCII text must not decode to replacement characters.'
+    Assert-True -Condition ($decodedText.Contains([string][char]0x0439)) -Message 'Non-ASCII text must decode to expected character.'
+    Assert-Match -Text $decodedText -Pattern 'soc_sleeping_bag\.ltx.*soc_sleeping_bag' -Message 'Non-ASCII file must be properly patched.'
+
+    $fixture = New-DeploymentFixture -Name 'rollback-locked-file'
+    $before = Get-TreeSnapshot -Root $fixture.Game
+    $targetToLock = Join-Path $fixture.Game 'gamedata\scripts\bind_stalker.script'
+    $lockStream = [IO.File]::Open($targetToLock, [IO.FileMode]::Open, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+    try {
+        $result = Invoke-Deploy -Fixture $fixture -Apply
+        Assert-True -Condition ($result.ExitCode -ne 0) -Message "Apply should have failed when a target file is locked. Output: $($result.Output)"
+    }
+    finally {
+        $lockStream.Dispose()
+    }
+    $after = Get-TreeSnapshot -Root $fixture.Game
+    Assert-SnapshotEqual -Expected $before -Actual $after -Message 'Rolled-back deployment must restore all files to pre-apply state when a file is locked.'
+
+    $fixture = New-DeploymentFixture -Name 'rollback-locked-manifest'
+    $manifestPath = Join-Path $fixture.Game 'gamedata\soc_sleeping_bag_deployed.json'
+    Write-Utf8Text -Path $manifestPath -Text '{"preExisting": true}'
+    $before = Get-TreeSnapshot -Root $fixture.Game
+    $lockStream = [IO.File]::Open($manifestPath, [IO.FileMode]::Open, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+    try {
+        $result = Invoke-Deploy -Fixture $fixture -Apply
+        Assert-True -Condition ($result.ExitCode -ne 0) -Message "Apply should have failed when deployment manifest is locked. Output: $($result.Output)"
+    }
+    finally {
+        $lockStream.Dispose()
+    }
+    $after = Get-TreeSnapshot -Root $fixture.Game
+    Assert-SnapshotEqual -Expected $before -Actual $after -Message 'Rolled-back deployment must restore all files to pre-apply state when manifest is locked.'
 
     Write-Output 'PASS: merge-aware deployment contracts'
 }
