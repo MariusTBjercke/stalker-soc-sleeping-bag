@@ -1,0 +1,8 @@
+/config/local.json
+/dist/
+/out/
+/references/*
+!/references/README.md
+.DS_Store
+Thumbs.db
+Desktop.ini
