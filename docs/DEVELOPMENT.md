@@ -37,22 +37,35 @@ interpreter available in the current development environment:
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/tests/patch_engine_test.ps1
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/tests/deploy_test.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/tests/uninstall_test.ps1
 ```
 
 PowerShell 7 may be used with the equivalent `pwsh -NoProfile -File ...`
-commands when installed. The deployer supports an explicit dry run:
+commands when installed. The deployer and uninstaller support an explicit dry run:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/deploy.ps1 -GameDir '<game-dir>' -SevenZipPath 'C:\Program Files\7-Zip\7z.exe'
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/uninstall.ps1 -GameDir '<game-dir>'
 ```
 
-The command prints each copy or patch with its source origin and hash. It does
-not write to the game unless `-Apply` is supplied.
+The commands print each planned action and its target path. Neither command
+writes to the game directory unless `-Apply` is supplied.
 
-## Deployment and runtime tests
+## Deployment and removal semantics
 
-`tools/deploy.ps1` and `tools/uninstall.ps1` will be dry-run by default.
-Review their plan before adding `-Apply`. Game-side writes require explicit
-approval. Use a disposable save for every in-game test, including sleep,
-damage interruption, cleanup, deploy, uninstall, and redeploy checks. Do not
-test against a live save.
+`tools/deploy.ps1` and `tools/uninstall.ps1` operate as dry-run by default.
+Review their plan before adding `-Apply`.
+
+- **Deployment (`tools/deploy.ps1`):** Stages patches and mod-owned files,
+  creates timestamped backups of pre-existing loose files, atomically replaces
+  targets, and writes `gamedata/soc_sleeping_bag_deployed.json` last.
+- **Removal (`tools/uninstall.ps1`):** Manifest-driven and ownership-aware.
+  Unchanged mod-owned files are deleted; mod-owned files modified after
+  deployment are reported and retained. Shared files lose only marked lines;
+  an archive-materialized shared file that reproduces its recorded clean base
+  hash after marker removal is deleted, while one with unrelated edits remains
+  loose. The deployment manifest is deleted last.
+
+Game-side writes require explicit approval. Use a disposable save for every
+in-game test, including sleep, damage interruption, cleanup, deploy, uninstall,
+and redeploy checks. Do not test against a live save.
