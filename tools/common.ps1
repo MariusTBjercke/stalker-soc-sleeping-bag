@@ -319,3 +319,129 @@ function Remove-MarkedBlock {
 
     return ConvertFrom-PatchLines -Lines $retainedLines.ToArray()
 }
+
+function Get-LocalConfig {
+    [CmdletBinding()]
+    param([string] $ConfigPath)
+
+    if ([string]::IsNullOrWhiteSpace($ConfigPath)) {
+        $ConfigPath = Join-Path (Get-RepoRoot) 'config\local.json'
+    }
+    $resolvedPath = [IO.Path]::GetFullPath($ConfigPath)
+    if (-not (Test-Path -LiteralPath $resolvedPath -PathType Leaf)) {
+        return $null
+    }
+
+    try {
+        return (Get-Content -LiteralPath $resolvedPath -Raw | ConvertFrom-Json)
+    }
+    catch {
+        throw "Local configuration is not valid JSON: $resolvedPath. $($_.Exception.Message)"
+    }
+}
+
+function Get-GameIdentity {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string] $GameDir)
+
+    $resolvedGameDir = [IO.Path]::GetFullPath($GameDir)
+    $executablePath = $null
+    foreach ($name in @('XR_3DA.exe', 'xrEngine.exe')) {
+        $candidate = Join-Path $resolvedGameDir $name
+        if (Test-Path -LiteralPath $candidate -PathType Leaf) {
+            $executablePath = $candidate
+            break
+        }
+    }
+    if ($null -eq $executablePath) {
+        throw "Game executable not found. Expected XR_3DA.exe or xrEngine.exe under: $resolvedGameDir"
+    }
+
+    $executable = Get-Item -LiteralPath $executablePath
+    return [pscustomobject]@{
+        executablePath = $executable.FullName
+        executableName = $executable.Name
+        executableVersion = $executable.VersionInfo.FileVersion
+        executableSha256 = Get-Sha256 -Path $executable.FullName
+    }
+}
+
+function Get-EffectiveGameFile {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string] $GameDir,
+        [Parameter(Mandatory)][string] $LooseRelativePath,
+        [Parameter(Mandatory)][string] $ArchiveRelativePath,
+        [Parameter(Mandatory)][string] $SevenZipPath,
+        [Parameter(Mandatory)][string] $StageDir
+    )
+
+    $resolvedGameDir = [IO.Path]::GetFullPath($GameDir)
+    $loosePath = Resolve-ConfinedPath -Root $resolvedGameDir -RelativePath $LooseRelativePath
+    if (Test-Path -LiteralPath $loosePath -PathType Leaf) {
+        return [pscustomobject]@{
+            Text = [IO.File]::ReadAllText($loosePath)
+            Origin = 'loose'
+            BaseHash = Get-Sha256 -Path $loosePath
+            SourcePath = $loosePath
+        }
+    }
+
+    if (-not (Test-Path -LiteralPath $SevenZipPath -PathType Leaf)) {
+        throw "7-Zip executable or script not found: $SevenZipPath"
+    }
+    $archivePath = Resolve-ConfinedPath -Root $resolvedGameDir -RelativePath 'resources\configs.db'
+    if (-not (Test-Path -LiteralPath $archivePath -PathType Leaf)) {
+        throw "Game resource archive not found: $archivePath"
+    }
+
+    $resolvedStageDir = [IO.Path]::GetFullPath($StageDir)
+    New-Item -ItemType Directory -Path $resolvedStageDir -Force | Out-Null
+    $arguments = @('x', $archivePath, $ArchiveRelativePath, ('-o' + $resolvedStageDir), '-y')
+    & $SevenZipPath @arguments | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        throw "7-Zip failed to extract archive member '$ArchiveRelativePath' (exit code $LASTEXITCODE)."
+    }
+
+    $candidates = @(Get-ChildItem -LiteralPath $resolvedStageDir -Recurse -File)
+    if ($candidates.Count -ne 1) {
+        throw "Archive extraction for '$ArchiveRelativePath' must produce exactly one file; found $($candidates.Count)."
+    }
+
+    return [pscustomobject]@{
+        Text = [IO.File]::ReadAllText($candidates[0].FullName)
+        Origin = 'archive'
+        BaseHash = Get-Sha256 -Path $candidates[0].FullName
+        SourcePath = $archivePath + '::' + $ArchiveRelativePath
+    }
+}
+
+function Invoke-PatchManifest {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string] $Text,
+        [Parameter(Mandatory)] $FileDefinition
+    )
+
+    $markerProperty = $FileDefinition.PSObject.Properties['marker']
+    $marker = if ($null -ne $markerProperty) { [string]$markerProperty.Value } else { 'soc_sleeping_bag' }
+    $result = $Text
+    foreach ($patch in @($FileDefinition.patches)) {
+        switch ([string]$patch.kind) {
+            'line' {
+                $result = Add-MarkedLine -Text $result -Anchor $patch.anchor -Line $patch.line -Marker $marker -Position $patch.position
+            }
+            'luaFunction' {
+                $result = Add-MarkedLineInFunction -Text $result -FunctionSignature $patch.function -Anchor $patch.anchor -Line $patch.line -Marker $marker -Position $patch.position
+            }
+            'block' {
+                $result = Add-MarkedBlock -Text $result -Anchor $patch.anchor -Lines @($patch.lines) -BeginMarker $patch.beginMarker -EndMarker $patch.endMarker -Position $patch.position
+            }
+            default {
+                throw "Unsupported patch kind: $($patch.kind)"
+            }
+        }
+    }
+
+    return $result
+}

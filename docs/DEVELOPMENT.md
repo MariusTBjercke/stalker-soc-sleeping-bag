@@ -11,28 +11,43 @@ not be committed.
 
 The deployer needs 7-Zip with an X-Ray database plugin when a shared loose
 file is absent and must be materialized from `resources/configs.db`. Install
-the plugin compatible with the local 7-Zip architecture, then configure its
-executable path in `config/local.json`. Existing loose shared files are used
-as the base, so archive extraction is not required for those files.
+7-Zip, close its UI, and copy the plugin DLL matching the 7-Zip architecture
+into the 7-Zip `Formats` directory. For the usual 64-bit installation this is
+`XDB_x64.dll` under `C:\Program Files\7-Zip\Formats\`. Use the plugin's x86
+DLL only with 32-bit 7-Zip. If Windows marked the downloaded DLL as blocked,
+open its Properties dialog and select **Unblock** before starting 7-Zip.
+
+Verify the plugin from PowerShell before deploying:
+
+```powershell
+& 'C:\Program Files\7-Zip\7z.exe' l '<game-dir>\resources\configs.db'
+```
+
+The listing must succeed and report `Type = xdb`. Copy
+`config/local.example.json` to the ignored `config/local.json` and set
+`sevenZipPath` to that `7z.exe`. Existing loose shared files are used as the
+merge base, so extraction is needed only when a declared shared loose file is
+absent.
 
 ## Tests and checks
 
-Run commands from the repository root. Task 1's repository-policy check is
-the current validation. After Task 2 adds the harness, run:
+Run commands from the repository root. Windows PowerShell 5.1 is the
+interpreter available in the current development environment:
 
 ```powershell
-pwsh -NoProfile -File tools/tests/patch_engine_test.ps1
-pwsh -NoProfile -File tools/check.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/tests/patch_engine_test.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/tests/deploy_test.ps1
 ```
 
-The deployer will also support an explicit fixture dry run:
+PowerShell 7 may be used with the equivalent `pwsh -NoProfile -File ...`
+commands when installed. The deployer supports an explicit dry run:
 
 ```powershell
-pwsh -NoProfile -File tools/deploy.ps1 -GameDir tools/tests/fixtures/game -SevenZipPath tools/tests/fake_7z.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/deploy.ps1 -GameDir '<game-dir>' -SevenZipPath 'C:\Program Files\7-Zip\7z.exe'
 ```
 
-These future commands are documented here as the planned interface; they do
-not exist at repository-contract stage.
+The command prints each copy or patch with its source origin and hash. It does
+not write to the game unless `-Apply` is supplied.
 
 ## Deployment and runtime tests
 

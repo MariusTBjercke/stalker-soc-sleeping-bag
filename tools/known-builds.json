@@ -1,0 +1,13 @@
+{
+  "builds": [
+    {
+      "executableVersion": "1.10.3+68-42",
+      "steamBuild": "24067120",
+      "executableSha256": "b9b910a59c79e265311b742c7b1dca63d698052833f3332e92abfac179c8c30e",
+      "files": {
+        "config/system.ltx": "6864ee5ffbe347c60d285b5c87d6afd5d3461228231706d2436c4f74035578ef",
+        "scripts/bind_stalker.script": "c8e746df30c10d05445b78ac54a5ed2b51438e1774218e4174d54f3a0643f1d0"
+      }
+    }
+  ]
+}
