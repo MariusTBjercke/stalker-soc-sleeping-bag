@@ -36,5 +36,8 @@ before changing game behavior.
 | Behavior and constraints | `docs/superpowers/specs/2026-09-18-sleeping-bag-design.md` |
 | Implementation sequence | `docs/superpowers/plans/2026-09-18-sleeping-bag-implementation.md` |
 
-The next task is Task 7 of
-`docs/superpowers/plans/2026-09-18-sleeping-bag-implementation.md`.
+All ten plan tasks are dispatched; the mod is deployed to the game directory
+for the first test. The next step is the runtime engine probe and
+acceptance matrix on a disposable save, recorded in
+`docs/RUNTIME-TESTS.md`; any failure returns to the owning task before the
+0.1.0 archive is treated as final.

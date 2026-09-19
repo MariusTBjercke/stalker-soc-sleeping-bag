@@ -9,13 +9,18 @@ may only move to pass after its observed result matches.
 ## Deployment record
 
 First automated installation was applied on 2026-09-19 after a clean
-dry-run review.
+dry-run review, and an idempotent redeploy followed the version bump to
+`0.1.0` with byte-identical results (exactly five binder hook calls, one
+system include line, no duplicate markers).
 
-- Backup root: `out/backups/20260919T125715005Z` (contains the pre-existing
-  loose `gamedata/config/system.ltx`; the binder had no loose copy, so it
-  was materialized from `resources/configs.db` and correctly has no backup).
+- Backup roots (oldest first): `out/backups/20260919T125715005Z`
+  (initial install; contains the pre-existing loose
+  `gamedata/config/system.ltx`; the binder had no loose copy, so it was
+  materialized from `resources/configs.db` and correctly has no backup),
+  `out/backups/20260919T130954664Z` (redeploy after the version bump;
+  also contains the previously materialized binder).
 - Deployed manifest: `gamedata/soc_sleeping_bag_deployed.json`, 21 files,
-  mod version `0.1.0-dev`.
+  mod version `0.1.0`.
 - Shared-file diff after apply:
   - `gamedata/config/system.ltx`: exactly one added line,
     `#include "misc\soc_sleeping_bag.ltx" ; soc_sleeping_bag`. The user's
