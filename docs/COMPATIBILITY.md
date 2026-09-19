@@ -2,11 +2,13 @@
 
 ## Supported build
 
-The current target is the manual PC Steam installation of S.T.A.L.K.E.R.:
-Shadow of Chornobyl Enhanced Edition, executable `1.10.3+68-42`, Steam build
-`24067120`. This is a pre-release contract, not a tested gameplay release.
-Original Shadow of Chornobyl, other Enhanced Edition games, Anomaly, GAMMA,
-and Call of Chernobyl are outside support.
+The current release (`0.1.0`) supports the manual PC Steam installation of
+S.T.A.L.K.E.R.: Shadow of Chornobyl Enhanced Edition, executable
+`1.10.3+68-42`, Steam build `24067120`. This build is verified through the
+measured known-build registry and the deployment record in
+[Runtime tests](RUNTIME-TESTS.md); the disposable-save acceptance matrix
+there is the release gate. Original Shadow of Chornobyl, other Enhanced
+Edition games, Anomaly, GAMMA, and Call of Chernobyl are outside support.
 
 ## Installation model
 
