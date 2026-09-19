@@ -7,6 +7,16 @@
 -- Design: docs/superpowers/specs/2026-09-18-sleeping-bag-design.md
 -- Invariants: docs/ARCHITECTURE.md ("Sleeping state machine").
 
+-- Set to true only while running the disposable-save engine probe from
+-- docs/RUNTIME-TESTS.md; keep false in committed code that players run.
+local DEBUG = false
+
+local function log_debug(message)
+	if DEBUG and printf ~= nil then
+		printf("soc_sleeping_bag DEBUG: %s", message)
+	end
+end
+
 local ITEM_SECTION = "soc_sleeping_bag"
 -- The engine's established fast-forward factor and the configured normal one.
 local FAST_TIME_FACTOR = 10000
@@ -99,8 +109,11 @@ local function actor_has_item(section)
 	return found
 end
 
+-- The fifth parent-id argument spawns the bag directly into the actor's
+-- inventory (verified engine pattern; see docs/ARCHITECTURE.md).
 local function spawn_bag(actor)
-	alife():create(ITEM_SECTION, actor:position(), actor:level_vertex_id(), actor:game_vertex_id())
+	alife():create(ITEM_SECTION, actor:position(), actor:level_vertex_id(), actor:game_vertex_id(), actor:id())
+	log_debug("provisioned one bag")
 end
 
 -- The menu module owns the window and the localized refusal message; every
@@ -213,6 +226,7 @@ function cleanup()
 	state = STATE_IDLE
 	sleep_deadline = nil
 	heal_on_complete = false
+	log_debug("cleanup finished")
 end
 
 -- Creates one bag when the actor has none; reports whether one was created.
@@ -261,6 +275,7 @@ function start_sleep(hours, heal)
 	sleep_deadline = get_game_seconds() + clamped * SECONDS_PER_HOUR
 	heal_on_complete = (heal == true)
 	state = STATE_SLEEPING
+	log_debug("sleep started: hours=" .. tostring(clamped) .. " heal=" .. tostring(heal == true))
 	return true
 end
 
@@ -270,6 +285,7 @@ function abort_sleep(reason)
 	local was_sleeping = (state == STATE_SLEEPING)
 	cleanup()
 	if was_sleeping then
+		log_debug("sleep aborted: " .. tostring(reason))
 		notify_interrupted()
 	end
 	return was_sleeping
@@ -288,6 +304,7 @@ function finish_sleep()
 		end
 	end
 	cleanup()
+	log_debug("sleep finished")
 	return true
 end
 
@@ -328,6 +345,7 @@ function on_item_use(obj)
 
 	local reason = eligibility_reason(get_actor(), get_time_ms())
 	schedule_provision()
+	log_debug("bag used; reason=" .. tostring(reason))
 	if reason ~= nil then
 		menu_show_refusal(reason)
 		return true

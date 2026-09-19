@@ -297,6 +297,8 @@ test("provisioning: creates one bag when absent and never duplicates", function(
 	m.now_ms = 1000
 	m.update(0)
 	eq(#m.mock.created_items, 1, "one bag created")
+	eq(m.mock.created_items[1].section, "soc_sleeping_bag", "bag section")
+	eq(m.mock.created_items[1].parent_id, m.db.actor:id(), "bag goes into the actor inventory")
 	m.update(0)
 	m.update(0)
 	eq(#m.mock.created_items, 1, "repeated updates do not duplicate")

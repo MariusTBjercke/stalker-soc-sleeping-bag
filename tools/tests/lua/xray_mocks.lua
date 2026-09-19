@@ -78,16 +78,23 @@ function M.new_env(opts)
 
 	env.db = { actor = nil }
 
+	local next_item_id = 1000
+	env.mock.next_actor_id = function()
+		next_item_id = next_item_id + 1
+		return next_item_id
+	end
+
 	env.alife = function()
 		record("alife")
 		return {
-			create = function(section, position, level_vertex_id, game_vertex_id)
+			create = function(self, section, position, level_vertex_id, game_vertex_id, parent_id)
 				record("alife.create")
 				table.insert(env.mock.created_items, {
 					section = section,
 					position = position,
 					level_vertex_id = level_vertex_id,
 					game_vertex_id = game_vertex_id,
+					parent_id = parent_id,
 				})
 			end,
 		}
@@ -115,7 +122,9 @@ function M.make_actor(env, opts)
 	actor._talking = opts.talking or false
 	actor._bleeding = opts.bleeding or 0
 	actor._items = opts.items or {}
+	actor._id = env.mock.next_actor_id()
 
+	function actor:id() return self._id end
 	function actor:position() return { x = 0, y = 0, z = 0 } end
 	function actor:level_vertex_id() return 1 end
 	function actor:game_vertex_id() return 1 end
