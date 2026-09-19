@@ -51,8 +51,7 @@ $navi = @($layout.SelectNodes("//*[local-name()='wnd_selector_info']"))
 $naviIds = @($navi | ForEach-Object { $_.GetAttribute('wnd') } | Sort-Object)
 Assert-Equal -Expected (($buttonIds | Sort-Object) -join '|') -Actual ($naviIds -join '|') -Message 'The controller navigation must chain every button exactly once.'
 
-# Every locale folder must carry the complete string set as explicit English
-# fallback content until reviewed translations exist.
+# Every locale folder must carry the complete string set.
 foreach ($locale in $expectedLocales) {
     $localePath = Join-Path $textRoot ($locale + '\st_soc_sleeping_bag.xml')
     Assert-True -Condition (Test-Path -LiteralPath $localePath -PathType Leaf) -Message "RED: the $locale locale is missing st_soc_sleeping_bag.xml."

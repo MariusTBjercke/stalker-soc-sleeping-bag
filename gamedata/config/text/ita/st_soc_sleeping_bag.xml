@@ -1,51 +1,51 @@
 <?xml version="1.0" encoding="windows-1251" ?>
 <string_table>
 	<string id="st_soc_sleeping_bag_name">
-		<text>Sleeping bag</text>
+		<text>Sacco a pelo</text>
 	</string>
 	<string id="st_soc_sleeping_bag_description">
-		<text>A compact bedroll for long rest. %c[255,238,155,23]Use%c[default] the bag to rest: one, three, or nine hours, or sleep until healed. Resting is refused while talking, bleeding, heavily irradiated, or right after combat.</text>
+		<text>Un sacco a pelo compatto per un lungo riposo. %c[255,238,155,23]Usa%c[default] il sacco per riposare: una, tre o nove ore, oppure dormi fino a guarire. Non si puт riposare durante una conversazione, con un'emorragia, con forte irradiazione o subito dopo uno scontro.</text>
 	</string>
 	<string id="st_soc_sleeping_bag_title">
-		<text>Rest</text>
+		<text>Riposo</text>
 	</string>
 	<string id="st_soc_sleeping_bag_sleep_1">
-		<text>Sleep 1 hour</text>
+		<text>Dormi 1 ora</text>
 	</string>
 	<string id="st_soc_sleeping_bag_sleep_3">
-		<text>Sleep 3 hours</text>
+		<text>Dormi 3 ore</text>
 	</string>
 	<string id="st_soc_sleeping_bag_sleep_9">
-		<text>Sleep 9 hours</text>
+		<text>Dormi 9 ore</text>
 	</string>
 	<string id="st_soc_sleeping_bag_sleep_heal">
-		<text>Sleep until healed</text>
+		<text>Dormi fino a guarire</text>
 	</string>
 	<string id="st_soc_sleeping_bag_cancel">
-		<text>Cancel</text>
+		<text>Annulla</text>
 	</string>
 	<string id="st_soc_sleeping_bag_no_level">
-		<text>You cannot rest here.</text>
+		<text>Non puoi riposare qui.</text>
 	</string>
 	<string id="st_soc_sleeping_bag_no_actor">
-		<text>You cannot rest now.</text>
+		<text>Non puoi riposare adesso.</text>
 	</string>
 	<string id="st_soc_sleeping_bag_dead">
-		<text>You cannot rest now.</text>
+		<text>Non puoi riposare adesso.</text>
 	</string>
 	<string id="st_soc_sleeping_bag_talking">
-		<text>You cannot rest while talking.</text>
+		<text>Non puoi riposare mentre parli.</text>
 	</string>
 	<string id="st_soc_sleeping_bag_bleeding">
-		<text>You cannot rest while bleeding.</text>
+		<text>Non puoi riposare con un'emorragia.</text>
 	</string>
 	<string id="st_soc_sleeping_bag_radiation">
-		<text>You cannot rest while this irradiated.</text>
+		<text>Sei troppo irradiato per riposare.</text>
 	</string>
 	<string id="st_soc_sleeping_bag_recent_hit">
-		<text>You cannot rest right after combat.</text>
+		<text>Non puoi riposare subito dopo uno scontro.</text>
 	</string>
 	<string id="st_soc_sleeping_bag_interrupted">
-		<text>Your rest was interrupted.</text>
+		<text>Il tuo riposo и stato interrotto.</text>
 	</string>
 </string_table>

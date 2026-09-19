@@ -1,51 +1,51 @@
 <?xml version="1.0" encoding="windows-1251" ?>
 <string_table>
 	<string id="st_soc_sleeping_bag_name">
-		<text>Sleeping bag</text>
+		<text>寝袋</text>
 	</string>
 	<string id="st_soc_sleeping_bag_description">
-		<text>A compact bedroll for long rest. %c[255,238,155,23]Use%c[default] the bag to rest: one, three, or nine hours, or sleep until healed. Resting is refused while talking, bleeding, heavily irradiated, or right after combat.</text>
+		<text>長い休息のためのコンパクトな寝袋。寝袋を%c[255,238,155,23]使う%c[default]と、1時間、3時間、9時間、または回復するまで休息できる。会話中、出血中、強い被曝状態、または戦闘直後は休息できない。</text>
 	</string>
 	<string id="st_soc_sleeping_bag_title">
-		<text>Rest</text>
+		<text>休息</text>
 	</string>
 	<string id="st_soc_sleeping_bag_sleep_1">
-		<text>Sleep 1 hour</text>
+		<text>1時間眠る</text>
 	</string>
 	<string id="st_soc_sleeping_bag_sleep_3">
-		<text>Sleep 3 hours</text>
+		<text>3時間眠る</text>
 	</string>
 	<string id="st_soc_sleeping_bag_sleep_9">
-		<text>Sleep 9 hours</text>
+		<text>9時間眠る</text>
 	</string>
 	<string id="st_soc_sleeping_bag_sleep_heal">
-		<text>Sleep until healed</text>
+		<text>回復するまで眠る</text>
 	</string>
 	<string id="st_soc_sleeping_bag_cancel">
-		<text>Cancel</text>
+		<text>キャンセル</text>
 	</string>
 	<string id="st_soc_sleeping_bag_no_level">
-		<text>You cannot rest here.</text>
+		<text>ここでは休息できない。</text>
 	</string>
 	<string id="st_soc_sleeping_bag_no_actor">
-		<text>You cannot rest now.</text>
+		<text>今は休息できない。</text>
 	</string>
 	<string id="st_soc_sleeping_bag_dead">
-		<text>You cannot rest now.</text>
+		<text>今は休息できない。</text>
 	</string>
 	<string id="st_soc_sleeping_bag_talking">
-		<text>You cannot rest while talking.</text>
+		<text>会話中は休息できない。</text>
 	</string>
 	<string id="st_soc_sleeping_bag_bleeding">
-		<text>You cannot rest while bleeding.</text>
+		<text>出血中は休息できない。</text>
 	</string>
 	<string id="st_soc_sleeping_bag_radiation">
-		<text>You cannot rest while this irradiated.</text>
+		<text>被曝が強すぎて休息できない。</text>
 	</string>
 	<string id="st_soc_sleeping_bag_recent_hit">
-		<text>You cannot rest right after combat.</text>
+		<text>戦闘直後は休息できない。</text>
 	</string>
 	<string id="st_soc_sleeping_bag_interrupted">
-		<text>Your rest was interrupted.</text>
+		<text>休息が中断された。</text>
 	</string>
 </string_table>

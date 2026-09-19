@@ -1,51 +1,51 @@
 <?xml version="1.0" encoding="windows-1251" ?>
 <string_table>
 	<string id="st_soc_sleeping_bag_name">
-		<text>Sleeping bag</text>
+		<text>Hбlуzsбk</text>
 	</string>
 	<string id="st_soc_sleeping_bag_description">
-		<text>A compact bedroll for long rest. %c[255,238,155,23]Use%c[default] the bag to rest: one, three, or nine hours, or sleep until healed. Resting is refused while talking, bleeding, heavily irradiated, or right after combat.</text>
+		<text>Kompakt hбlуzsбk hosszъ pihenйshez. %c[255,238,155,23]Hasznбld%c[default] a hбlуzsбkot a pihenйshez: egy, hбrom vagy kilenc уrбt, vagy aludj, amнg meg nem gyуgyulsz. Beszйlgetйs kцzben, vйrzйs esetйn, erхs sugбrfertхzцttsйgnйl vagy kцzvetlenьl harc utбn nem lehet pihenni.</text>
 	</string>
 	<string id="st_soc_sleeping_bag_title">
-		<text>Rest</text>
+		<text>Pihenйs</text>
 	</string>
 	<string id="st_soc_sleeping_bag_sleep_1">
-		<text>Sleep 1 hour</text>
+		<text>Alvбs 1 уrбt</text>
 	</string>
 	<string id="st_soc_sleeping_bag_sleep_3">
-		<text>Sleep 3 hours</text>
+		<text>Alvбs 3 уrбt</text>
 	</string>
 	<string id="st_soc_sleeping_bag_sleep_9">
-		<text>Sleep 9 hours</text>
+		<text>Alvбs 9 уrбt</text>
 	</string>
 	<string id="st_soc_sleeping_bag_sleep_heal">
-		<text>Sleep until healed</text>
+		<text>Alvбs a gyуgyulбsig</text>
 	</string>
 	<string id="st_soc_sleeping_bag_cancel">
-		<text>Cancel</text>
+		<text>Mйgse</text>
 	</string>
 	<string id="st_soc_sleeping_bag_no_level">
-		<text>You cannot rest here.</text>
+		<text>Itt nem pihenhetsz.</text>
 	</string>
 	<string id="st_soc_sleeping_bag_no_actor">
-		<text>You cannot rest now.</text>
+		<text>Most nem pihenhetsz.</text>
 	</string>
 	<string id="st_soc_sleeping_bag_dead">
-		<text>You cannot rest now.</text>
+		<text>Most nem pihenhetsz.</text>
 	</string>
 	<string id="st_soc_sleeping_bag_talking">
-		<text>You cannot rest while talking.</text>
+		<text>Beszйlgetйs kцzben nem pihenhetsz.</text>
 	</string>
 	<string id="st_soc_sleeping_bag_bleeding">
-		<text>You cannot rest while bleeding.</text>
+		<text>Vйrzйs kцzben nem pihenhetsz.</text>
 	</string>
 	<string id="st_soc_sleeping_bag_radiation">
-		<text>You cannot rest while this irradiated.</text>
+		<text>Tъl erхs a sugбrfertхzйsed a pihenйshez.</text>
 	</string>
 	<string id="st_soc_sleeping_bag_recent_hit">
-		<text>You cannot rest right after combat.</text>
+		<text>Kцzvetlenьl harc utбn nem pihenhetsz.</text>
 	</string>
 	<string id="st_soc_sleeping_bag_interrupted">
-		<text>Your rest was interrupted.</text>
+		<text>A pihenйsed megszakadt.</text>
 	</string>
 </string_table>

@@ -1,51 +1,51 @@
 <?xml version="1.0" encoding="windows-1251" ?>
 <string_table>
 	<string id="st_soc_sleeping_bag_name">
-		<text>Sleeping bag</text>
+		<text>Schlafsack</text>
 	</string>
 	<string id="st_soc_sleeping_bag_description">
-		<text>A compact bedroll for long rest. %c[255,238,155,23]Use%c[default] the bag to rest: one, three, or nine hours, or sleep until healed. Resting is refused while talking, bleeding, heavily irradiated, or right after combat.</text>
+		<text>Ein kompakter Schlafsack fьr eine lange Rast. %c[255,238,155,23]Benutze%c[default] den Schlafsack, um dich auszuruhen: eine, drei oder neun Stunden, oder schlafe, bis du geheilt bist. Ausruhen ist nicht mцglich wдhrend eines Gesprдchs, bei Blutungen, bei starker Verstrahlung oder direkt nach einem Kampf.</text>
 	</string>
 	<string id="st_soc_sleeping_bag_title">
-		<text>Rest</text>
+		<text>Ausruhen</text>
 	</string>
 	<string id="st_soc_sleeping_bag_sleep_1">
-		<text>Sleep 1 hour</text>
+		<text>1 Stunde schlafen</text>
 	</string>
 	<string id="st_soc_sleeping_bag_sleep_3">
-		<text>Sleep 3 hours</text>
+		<text>3 Stunden schlafen</text>
 	</string>
 	<string id="st_soc_sleeping_bag_sleep_9">
-		<text>Sleep 9 hours</text>
+		<text>9 Stunden schlafen</text>
 	</string>
 	<string id="st_soc_sleeping_bag_sleep_heal">
-		<text>Sleep until healed</text>
+		<text>Bis zur Heilung schlafen</text>
 	</string>
 	<string id="st_soc_sleeping_bag_cancel">
-		<text>Cancel</text>
+		<text>Abbrechen</text>
 	</string>
 	<string id="st_soc_sleeping_bag_no_level">
-		<text>You cannot rest here.</text>
+		<text>Hier kannst du dich nicht ausruhen.</text>
 	</string>
 	<string id="st_soc_sleeping_bag_no_actor">
-		<text>You cannot rest now.</text>
+		<text>Jetzt kannst du dich nicht ausruhen.</text>
 	</string>
 	<string id="st_soc_sleeping_bag_dead">
-		<text>You cannot rest now.</text>
+		<text>Jetzt kannst du dich nicht ausruhen.</text>
 	</string>
 	<string id="st_soc_sleeping_bag_talking">
-		<text>You cannot rest while talking.</text>
+		<text>Wдhrend eines Gesprдchs kannst du dich nicht ausruhen.</text>
 	</string>
 	<string id="st_soc_sleeping_bag_bleeding">
-		<text>You cannot rest while bleeding.</text>
+		<text>Mit Blutungen kannst du dich nicht ausruhen.</text>
 	</string>
 	<string id="st_soc_sleeping_bag_radiation">
-		<text>You cannot rest while this irradiated.</text>
+		<text>Du bist zu stark verstrahlt, um dich auszuruhen.</text>
 	</string>
 	<string id="st_soc_sleeping_bag_recent_hit">
-		<text>You cannot rest right after combat.</text>
+		<text>Direkt nach einem Kampf kannst du dich nicht ausruhen.</text>
 	</string>
 	<string id="st_soc_sleeping_bag_interrupted">
-		<text>Your rest was interrupted.</text>
+		<text>Deine Ruhe wurde unterbrochen.</text>
 	</string>
 </string_table>

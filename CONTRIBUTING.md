@@ -33,11 +33,13 @@ only in `VERSION`; move release notes from `Unreleased` into a dated
 ## Localization status
 
 `gamedata/config/text/eng/st_soc_sleeping_bag.xml` holds the reviewed English
-strings. Every other EE locale folder carries the same English text as
-explicit fallback content, reviewed only by the authors, until a native
-speaker reviews it. Do not label that fallback as a translated locale; mark
-translation contributions as reviewed only after a fluent speaker checks the
-text for the game's tone and terminology.
+strings. The other locale folders hold translations that Claude wrote and no native
+speaker has reviewed yet. Each file uses the code page the game reads that
+language in (cp1250 for cze, pol and hg, cp1251 for rus and ukr, cp1252 for
+fra, ger, ita and spa, UTF-8 for jpn, kor and the Chinese folders), and
+shared words such as Cancel, Rest and Bleeding follow the game's own
+translations. Do not call a locale reviewed until a fluent speaker has
+checked the text for the game's tone and terminology. Corrections are welcome.
 
 ## Releasing
 
