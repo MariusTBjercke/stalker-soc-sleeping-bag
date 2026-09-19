@@ -38,6 +38,8 @@ if (-not [string]::IsNullOrWhiteSpace($output)) {
 }
 Assert-Equal -Expected 0 -Actual $exitCode -Message 'Packaging must succeed for a clean release worktree.'
 Assert-True -Condition (Test-Path -LiteralPath $distZip -PathType Leaf) -Message 'The release archive must exist after packaging.'
+Assert-True -Condition (Test-Path -LiteralPath ($distZip + '.sha256') -PathType Leaf) -Message 'A .sha256 checksum file must be written next to the archive.'
+Assert-True -Condition (Test-Path -LiteralPath ($distZip + '.sha256') -PathType Leaf) -Message 'A .sha256 checksum file must be written next to the archive.'
 
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $zip = [IO.Compression.ZipFile]::OpenRead($distZip)
@@ -45,9 +47,9 @@ try {
     $entries = @($zip.Entries | ForEach-Object { $_.FullName -replace '\\', '/' })
 
     $required = @(
-        'gamedata/', 'patches/manifest.json', 'tools/deploy.ps1', 'tools/uninstall.ps1',
+        'gamedata/', 'art/icon/sleeping-bag-2x2.dxt5', 'patches/manifest.json', 'tools/deploy.ps1', 'tools/uninstall.ps1',
         'tools/common.ps1', 'tools/known-builds.json', 'config/local.example.json',
-        'README.md', 'LICENSE', 'VERSION', 'CHANGELOG.md', 'docs/COMPATIBILITY.md', 'docs/DEVELOPMENT.md'
+        'INSTALL.txt', 'README.md', 'LICENSE', 'VERSION', 'CHANGELOG.md', 'docs/COMPATIBILITY.md', 'docs/DEVELOPMENT.md'
     )
     foreach ($requiredEntry in $required) {
         $prefix = if ($requiredEntry.EndsWith('/')) { $requiredEntry + '*' } else { $requiredEntry + '/*' }

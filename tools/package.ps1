@@ -46,6 +46,8 @@ if (Test-Path -LiteralPath $zipPath) {
 
 $allowlist = @(
     'gamedata',
+    'art\icon\sleeping-bag-2x2.dxt5',
+    'art\icon\sleeping-bag-2x2-100x100.png',
     'patches\manifest.json',
     'config\local.example.json',
     'README.md',
@@ -73,6 +75,14 @@ foreach ($entry in $allowlist) {
     Copy-Item -LiteralPath $source -Destination $destination -Recurse
 }
 
+# Plain-text install guide at the archive root, with the version filled in.
+$installTemplate = Join-Path $repoRoot 'docs\package\INSTALL.txt'
+if (-not (Test-Path -LiteralPath $installTemplate -PathType Leaf)) {
+    throw 'Packaging refused: docs\package\INSTALL.txt is missing.'
+}
+$installText = ([IO.File]::ReadAllText($installTemplate)).Replace('{{VERSION}}', $version)
+[IO.File]::WriteAllText((Join-Path $staging 'INSTALL.txt'), $installText, [Text.UTF8Encoding]::new($false))
+
 # Guard rails: nothing machine-local, generated, or third-party may have
 # been staged.
 $forbiddenNames = @('local.json', 'references', 'backups')
@@ -87,5 +97,9 @@ New-Item -ItemType Directory -Path $distDir -Force | Out-Null
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 [IO.Compression.ZipFile]::CreateFromDirectory($staging, $zipPath, [IO.Compression.CompressionLevel]::Optimal, $false)
 
+$hash = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash.ToLowerInvariant()
+[IO.File]::WriteAllText(($zipPath + '.sha256'), ($hash + '  ' + (Split-Path -Leaf $zipPath) + "`n"), [Text.UTF8Encoding]::new($false))
+
 Write-Output "Package staged: $staging"
 Write-Output "Archive created: $zipPath"
+Write-Output "Checksum: $zipPath.sha256"

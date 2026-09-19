@@ -22,8 +22,9 @@ before changing game behavior.
 - Do not commit extracted game files, ABC code or assets, saves, deployment
   backups, or `config/local.json`.
 - Do not modify `fsgame_soc.ltx`.
-- Deployment and removal remain dry-run operations unless the user explicitly
-  supplies `-Apply` after reviewing the plan.
+- Agents may run deployment with `-Apply` when testing (authorized by the
+  user on 2026-09-19); review the dry-run plan first. Removal stays a dry-run
+  unless the user explicitly supplies `-Apply`.
 - Use a disposable save for every runtime test that can write game state.
 
 ## Reading order and next step
@@ -36,8 +37,7 @@ before changing game behavior.
 | Behavior and constraints | `docs/superpowers/specs/2026-09-18-sleeping-bag-design.md` |
 | Implementation sequence | `docs/superpowers/plans/2026-09-18-sleeping-bag-implementation.md` |
 
-All ten plan tasks are dispatched; the mod is deployed to the game directory
-for the first test. The next step is the runtime engine probe and
-acceptance matrix on a disposable save, recorded in
-`docs/RUNTIME-TESTS.md`; any failure returns to the owning task before the
-0.1.0 archive is treated as final.
+Version 0.1.0 is deployed for testing and packaged in `dist/`. Playtests so
+far are logged in `docs/RUNTIME-TESTS.md`; rows not listed as confirmed there
+are still pending. Next: publish the GitHub release (see CONTRIBUTING.md), then
+consider Steam Workshop support.

@@ -23,15 +23,25 @@ verified. Automated checks pass; runtime acceptance evidence is collected in
   controller navigation.
 - Resting is refused with a localized reason while talking, bleeding,
   heavily irradiated, or within ten seconds of combat damage.
-- Damage during sleep aborts immediately without healing; time factor,
-  input, weapon, and overlay recover through one idempotent cleanup path.
+- Damage during sleep, or health lost to hunger, radiation, or bleeding,
+  aborts immediately without healing; time factor, input, and weapon
+  recover through one idempotent cleanup path.
+- The bag has its own 2x2 inventory icon, added to the game's icon atlas at
+  install time (see [Architecture](docs/ARCHITECTURE.md)).
 
 ## Installation
 
-Prerequisite: 7-Zip with the X-Ray database plugin, because the deployer
-materializes missing shared files from the game's `resources/configs.db`.
-See [Development](docs/DEVELOPMENT.md) for the plugin setup and
-`config/local.json` paths.
+Download `soc-sleeping-bag-<version>.zip` (and its `.sha256` file) from the
+GitHub releases page and follow the `INSTALL.txt` inside it. The short
+version follows.
+
+Nothing else needs to be installed: the deployer is a PowerShell script
+(Windows PowerShell 5.1 ships with Windows) and reads the game's own files
+itself. Pass `-GameDir` or set `steamGameDir` in `config/local.json`.
+
+The mod cannot be installed by copying files alone: it adds hook lines to
+`bind_stalker.script` and `system.ltx` and builds the icon atlas from your
+own game files, so the deployer does that safely.
 
 Review before writing anything. The deployer is dry-run by default:
 
@@ -47,7 +57,9 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/deploy.ps1 -Apply
 ```
 
 Repeated apply is idempotent. A timestamped backup of pre-existing loose
-files is created under `out/backups/`.
+files is created under `out/backups/`. If another mod already ships
+`gamedata/textures/ui/ui_icon_equipment.dds`, the deployer stops rather than
+overwrite it.
 
 ## Removal
 

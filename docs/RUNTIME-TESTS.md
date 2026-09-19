@@ -34,6 +34,29 @@ system include line, no duplicate markers).
   registry hash) for the loose base `9a07fd45...` and binder installed
   content built from base `c8e746df...`.
 
+## Playtest log (2026-09-19)
+
+Findings from manual playtests, in order. Each fix is covered by offline
+tests; the matrix rows are marked only for what a playtest confirmed.
+
+1. The first build's sleeps never ended: `game.get_game_time()` returns a
+   CTime object and the module treated it as a number. The error surfaced in
+   the menu callback after the fast factor was set, so time raced on until the
+   actor died. Fixed by measuring elapsed time with `CTime:diffSec`, undoing
+   partial starts, and adding a 60 s real-time timeout.
+2. "Sleep until healed" while hungry killed the actor: starvation drains
+   health per game second and a nine hour skip is 32 400 of them. Fixed by
+   aborting when health drops below its starting value.
+3. The first menu layout scaled inconsistently. Rebuilt on EE's own dialog
+   pattern; the current layout looks right in game.
+4. The bag showed the Antirad icon. A custom 2x2 icon now ships (see
+   `docs/DEVELOPMENT.md`) and looks right in game.
+
+Confirmed in game after the fixes: the bag appears, the menu opens and looks
+right, timed sleeps advance the clock and end (actor updates run during the
+transition, so the `ui_movies.xml` fallback is not needed), and the icon
+displays. Everything not listed here stays **pending** in the tables below.
+
 ## Engine probe (task 8)
 
 Run in a disposable new save and a copied existing save. Before playing,
@@ -46,7 +69,7 @@ Probe lines print as `soc_sleeping_bag DEBUG: ...` in the game log
 | --- | --- | --- | --- | --- | --- |
 | 1 | Is `II_ANTIR` consumed before or after `callback.use_object` returns? | Use the bag, watch inventory immediately; DEBUG `bag used` line prints on use. If the bag disappears at once, consumption precedes or overlaps the callback; the scheduled 1000 ms restore must then bring back exactly one bag. | One bag returns ~1 s after use, or the bag never disappears | pending | pending |
 | 2 | Does actor `update(delta)` run while the custom menu is visible? | Open the menu and stand still; if the clock advances, updates continue | Recorded | pending | pending |
-| 3 | Does actor `update(delta)` run while the dark overlay/transition is visible? | Start a sleep; if the game clock advances to the deadline and `sleep finished` prints, updates continue under accelerated time | Recorded | pending | pending |
+| 3 | Does actor `update(delta)` run while the dark overlay/transition is visible? | Start a sleep; if the game clock advances to the deadline and `sleep finished` prints, updates continue under accelerated time | Recorded | Timed sleeps complete and restore, so updates continue (2026-09-19) | pass |
 | 4 | Is the original time factor restored after normal completion, damage abort, menu cancel, and load? | Use the debug console (`g_time_factor`) before/after each path | Factor returns to the captured value (normally `10`) in all four paths | pending | pending |
 | 5 | Do weapon and controls recover in all four paths? | Watch the weapon return and input work after each path | Recovered in all four paths | pending | pending |
 | 6 | Menu/window and controller navigation wiring | The menu opens, buttons highlight, controller d-pad moves focus, Escape cancels | Recorded | pending | pending |
@@ -65,7 +88,7 @@ new save, C = copied existing save.
 
 | Check | Save | Expected | Observed | Pass |
 | --- | --- | --- | --- | --- |
-| Bag appears automatically | D | One `soc_sleeping_bag` ~1 s after spawn | pending | pending |
+| Bag appears automatically | D | One `soc_sleeping_bag` ~1 s after spawn | Bag present in inventory (2026-09-19) | pass |
 | Bag appears automatically | C | One bag after load, no duplicates | pending | pending |
 | Ten repeated inventory opens | D | Still exactly one bag | pending | pending |
 | After use, cancel, load, level transition | D/C | Exactly one bag each time | pending | pending |
@@ -74,9 +97,9 @@ new save, C = copied existing save.
 
 | Check | Expected | Observed | Pass |
 | --- | --- | --- | --- |
-| Sleep 1 hour | Game clock advances 1 h (small frame overshoot allowed) | pending | pending |
-| Sleep 3 hours | Game clock advances 3 h | pending | pending |
-| Sleep 9 hours | Game clock advances 9 h | pending | pending |
+| Sleep 1 hour | Game clock advances 1 h (small frame overshoot allowed) | Sleep ends and time restores (2026-09-19) | pass |
+| Sleep 3 hours | Game clock advances 3 h | Sleep ends and time restores (2026-09-19) | pass |
+| Sleep 9 hours | Game clock advances 9 h | Sleep ends and time restores (2026-09-19) | pass |
 | Heal at full health | 1 hour, health unchanged (already full) | pending | pending |
 | Heal at half health | 5 hours, full health after completion only | pending | pending |
 | Heal at near-zero health | 9 hours, full health after completion only | pending | pending |
