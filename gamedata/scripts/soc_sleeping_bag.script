@@ -1,0 +1,335 @@
+-- Sleeping Bag: the gameplay state machine behind the reusable sleep item.
+-- Owns provisioning, eligibility, the sleep transition, aborts, and cleanup
+-- for S.T.A.L.K.E.R. SoC Enhanced Edition.
+-- Called from lines marked "-- soc_sleeping_bag" in bind_stalker.script;
+-- the sleep menu module (soc_sleeping_bag_menu) calls start_sleep and
+-- abort_sleep when its user makes a choice.
+-- Design: docs/superpowers/specs/2026-09-18-sleeping-bag-design.md
+-- Invariants: docs/ARCHITECTURE.md ("Sleeping state machine").
+
+local ITEM_SECTION = "soc_sleeping_bag"
+-- The engine's established fast-forward factor and the configured normal one.
+local FAST_TIME_FACTOR = 10000
+local FALLBACK_TIME_FACTOR = 10
+-- No sleep for this long after the last hit callback fired.
+local RECENT_HIT_MS = 10000
+-- Matches EE's existing severe-radiation warning threshold.
+local RADIATION_LIMIT = 0.7
+-- Delayed provisioning runs this long after spawn/load recovery.
+local PROVISION_DELAY_MS = 1000
+-- The sleep deadline is game seconds: game.get_game_time() plus in-game hours.
+local SECONDS_PER_HOUR = 3600
+
+-- States: idle (normal play), menu (sleep menu open), sleeping (transition).
+-- Only cleanup() may restore engine state, and cleanup() is idempotent.
+local STATE_IDLE = "idle"
+local STATE_MENU = "menu"
+local STATE_SLEEPING = "sleeping"
+
+local state = STATE_IDLE
+local captured_factor = nil
+local input_disabled = false
+local weapon_hidden = false
+local sleep_deadline = nil
+local heal_on_complete = false
+-- Real-time ms of the last actor hit, per the EE hit callback.
+local last_hit_ms = nil
+-- Real-time ms after which update() provisions one bag.
+local provision_at_ms = nil
+
+-- ------------------------------------------------------------------ adapters
+-- Every engine-facing call lives here or in the guarded menu calls below, so
+-- offline tests can replace the engine globals (time_global, game, level,
+-- db, alife, soc_sleeping_bag_menu) with mocks.
+
+local function get_time_ms()
+	return time_global()
+end
+
+local function get_game_seconds()
+	return game.get_game_time()
+end
+
+local function get_time_factor()
+	return level.get_time_factor()
+end
+
+local function set_time_factor(factor)
+	level.set_time_factor(factor)
+end
+
+local function disable_input()
+	level.disable_input()
+end
+
+local function enable_input()
+	level.enable_input()
+end
+
+local function get_actor()
+	return db.actor
+end
+
+local function hide_weapon()
+	local actor = get_actor()
+	if actor ~= nil then
+		actor:hide_weapon()
+	end
+end
+
+-- The weapon is only restored while the actor is alive.
+local function restore_weapon()
+	local actor = get_actor()
+	if actor ~= nil and actor:alive() then
+		actor:restore_weapon()
+	end
+end
+
+local function actor_has_item(section)
+	local actor = get_actor()
+	if actor == nil or actor.iterate_inventory == nil then
+		return false
+	end
+	local found = false
+	actor:iterate_inventory(function(owner, obj)
+		if not found and obj ~= nil and obj:section() == section then
+			found = true
+		end
+	end, actor)
+	return found
+end
+
+local function spawn_bag(actor)
+	alife():create(ITEM_SECTION, actor:position(), actor:level_vertex_id(), actor:game_vertex_id())
+end
+
+-- The menu module owns the window and the localized refusal message; both
+-- calls are safe before that module exists.
+local function menu_open()
+	if soc_sleeping_bag_menu ~= nil and soc_sleeping_bag_menu.open ~= nil then
+		soc_sleeping_bag_menu.open(get_actor())
+	end
+end
+
+local function menu_show_refusal(reason_id)
+	if soc_sleeping_bag_menu ~= nil and soc_sleeping_bag_menu.show_refusal ~= nil then
+		soc_sleeping_bag_menu.show_refusal(reason_id)
+	end
+end
+
+-- -------------------------------------------------------------- calculations
+
+-- Bounded healing duration for "Sleep until healed": hours of in-game sleep
+-- that reach full health, clamped to the 1..9 hour menu range.
+function healing_hours(health)
+	local clamped = 0
+	if health ~= nil then
+		if health < 0 then
+			clamped = 0
+		elseif health > 1 then
+			clamped = 1
+		else
+			clamped = health
+		end
+	end
+	return math.max(1, math.min(9, math.ceil((1 - clamped) * 9)))
+end
+
+-- Returns nil when the actor may sleep, otherwise the localization ID of the
+-- refusal reason. Checks run from cheapest to most gameplay-specific.
+function eligibility_reason(actor, now_ms)
+	if level == nil or level.name == nil or level.name() == nil then
+		return "st_soc_sleeping_bag_no_level"
+	end
+	if actor == nil then
+		return "st_soc_sleeping_bag_no_actor"
+	end
+	if not actor:alive() then
+		return "st_soc_sleeping_bag_dead"
+	end
+	if actor:is_talking() then
+		return "st_soc_sleeping_bag_talking"
+	end
+	if actor:get_bleeding() ~= 0 then
+		return "st_soc_sleeping_bag_bleeding"
+	end
+	local radiation = actor.radiation
+	if radiation == nil then
+		radiation = 0
+	end
+	if radiation >= RADIATION_LIMIT then
+		return "st_soc_sleeping_bag_radiation"
+	end
+	if last_hit_ms ~= nil then
+		local now = now_ms
+		if now == nil then
+			now = get_time_ms()
+		end
+		if (now - last_hit_ms) < RECENT_HIT_MS then
+			return "st_soc_sleeping_bag_recent_hit"
+		end
+	end
+	return nil
+end
+
+-- ------------------------------------------------------------ state machine
+
+-- The single restoration path. Restores the captured factor, or the normal
+-- configured factor when a stale fast factor has no surviving capture, then
+-- input, weapon, and transition state. Idempotent: with nothing captured or
+-- flagged it performs no engine writes, so repeated calls are harmless.
+function cleanup()
+	if captured_factor ~= nil then
+		set_time_factor(captured_factor)
+		captured_factor = nil
+	elseif get_time_factor() == FAST_TIME_FACTOR then
+		set_time_factor(FALLBACK_TIME_FACTOR)
+	end
+	if input_disabled then
+		enable_input()
+		input_disabled = false
+	end
+	if weapon_hidden then
+		restore_weapon()
+		weapon_hidden = false
+	end
+	state = STATE_IDLE
+	sleep_deadline = nil
+	heal_on_complete = false
+end
+
+-- Creates one bag when the actor has none; reports whether one was created.
+function ensure_item()
+	local actor = get_actor()
+	if actor == nil then
+		return false
+	end
+	if actor_has_item(ITEM_SECTION) then
+		return false
+	end
+	spawn_bag(actor)
+	return true
+end
+
+-- Spawn/load recovery: clears any stale transition first, then schedules the
+-- delayed inventory check so an interrupted sleep can never leak the fast
+-- factor or disabled input into a fresh session.
+function recover()
+	cleanup()
+	provision_at_ms = get_time_ms() + PROVISION_DELAY_MS
+end
+
+-- Starts a transition of `hours` in-game time; heals to full afterwards only
+-- when `heal` is set. Captures the original factor exactly once per sleep.
+function start_sleep(hours, heal)
+	if state == STATE_SLEEPING then
+		return false
+	end
+	local actor = get_actor()
+	if actor == nil then
+		return false
+	end
+
+	local clamped = math.max(1, math.min(9, math.ceil(hours or 1)))
+	captured_factor = get_time_factor()
+	disable_input()
+	input_disabled = true
+	hide_weapon()
+	weapon_hidden = true
+	set_time_factor(FAST_TIME_FACTOR)
+	sleep_deadline = get_game_seconds() + clamped * SECONDS_PER_HOUR
+	heal_on_complete = (heal == true)
+	state = STATE_SLEEPING
+	return true
+end
+
+-- Aborts an active sleep without healing; harmless when nothing is active.
+function abort_sleep(reason)
+	if state ~= STATE_SLEEPING then
+		return false
+	end
+	cleanup()
+	return true
+end
+
+-- Completes an active sleep: heals first (when requested), then restores
+-- engine state through the cleanup path.
+function finish_sleep()
+	if state ~= STATE_SLEEPING then
+		return false
+	end
+	if heal_on_complete then
+		local actor = get_actor()
+		if actor ~= nil and actor:alive() then
+			actor.health = 1.0
+		end
+	end
+	cleanup()
+	return true
+end
+
+-- ------------------------------------------------------------ integration
+-- These five functions are the marked hook surface in bind_stalker.script.
+
+function on_actor_net_spawn()
+	recover()
+end
+
+function on_actor_net_destroy()
+	cleanup()
+	provision_at_ms = nil
+end
+
+function on_actor_hit()
+	last_hit_ms = get_time_ms()
+	if state == STATE_SLEEPING then
+		abort_sleep("hit")
+	end
+end
+
+-- Returns false for items this mod does not own and true when the use is
+-- handled (opened the menu, or refused it with a localized reason). The menu
+-- opens only after eligibility succeeds.
+function on_item_use(obj)
+	if obj == nil then
+		return false
+	end
+	local section = obj:section()
+	if section ~= ITEM_SECTION then
+		return false
+	end
+
+	local reason = eligibility_reason(get_actor(), get_time_ms())
+	if reason ~= nil then
+		menu_show_refusal(reason)
+		return true
+	end
+
+	state = STATE_MENU
+	menu_open()
+	return true
+end
+
+-- Advances the state machine from the actor update hook. `delta` is
+-- deliberately unused: the sleep deadline is game time measured against
+-- game.get_game_time(), never frames or the accelerated factor.
+function update(delta)
+	if provision_at_ms ~= nil and get_time_ms() >= provision_at_ms then
+		provision_at_ms = nil
+		ensure_item()
+	end
+
+	if state ~= STATE_SLEEPING then
+		return
+	end
+
+	local actor = get_actor()
+	if actor == nil or not actor:alive() then
+		abort_sleep("actor_lost")
+		return
+	end
+
+	if sleep_deadline ~= nil and get_game_seconds() >= sleep_deadline then
+		finish_sleep()
+	end
+end
