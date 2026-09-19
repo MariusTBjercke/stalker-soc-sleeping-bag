@@ -50,7 +50,8 @@ try {
         'README.md', 'LICENSE', 'VERSION', 'CHANGELOG.md', 'docs/COMPATIBILITY.md', 'docs/DEVELOPMENT.md'
     )
     foreach ($requiredEntry in $required) {
-        $match = @($entries | Where-Object { $_ -eq $requiredEntry -or $_ -like ($requiredEntry + '/*') })
+        $prefix = if ($requiredEntry.EndsWith('/')) { $requiredEntry + '*' } else { $requiredEntry + '/*' }
+        $match = @($entries | Where-Object { $_ -eq $requiredEntry -or $_ -like $prefix })
         Assert-True -Condition (@($match).Count -gt 0) -Message "The archive must contain $requiredEntry."
     }
 

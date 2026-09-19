@@ -84,7 +84,8 @@ foreach ($name in $forbiddenNames) {
 }
 
 New-Item -ItemType Directory -Path $distDir -Force | Out-Null
-Compress-Archive -Path (Join-Path $staging '*') -DestinationPath $zipPath
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+[IO.Compression.ZipFile]::CreateFromDirectory($staging, $zipPath, [IO.Compression.CompressionLevel]::Optimal, $false)
 
 Write-Output "Package staged: $staging"
 Write-Output "Archive created: $zipPath"
