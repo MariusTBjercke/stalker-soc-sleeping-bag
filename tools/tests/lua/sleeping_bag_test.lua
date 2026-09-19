@@ -43,15 +43,22 @@ local function fresh(opts)
 	return env
 end
 
--- Installs a fake menu module and returns a spy over the calls it received.
+-- Installs a fake UI module and returns a spy over the calls it received.
 local function make_menu_spy(env)
-	local spy = { opened = 0, refusals = {} }
-	env.soc_sleeping_bag_menu = {
-		open = function(actor)
-			spy.opened = spy.opened + 1
+	local spy = { shown = 0, refusals = {}, interrupted = 0, choices = {}, open_flag = false }
+	env.soc_sleeping_bag_ui = {
+		show = function(on_choice)
+			spy.shown = spy.shown + 1
+			table.insert(spy.choices, on_choice)
 		end,
 		show_refusal = function(reason_id)
 			table.insert(spy.refusals, reason_id)
+		end,
+		show_interrupted = function()
+			spy.interrupted = spy.interrupted + 1
+		end,
+		is_open = function()
+			return spy.open_flag
 		end,
 	}
 	return spy
@@ -321,7 +328,7 @@ test("item use: ignores every section except the sleeping bag", function()
 	eq(m.on_item_use(make_item("wpn_knife")), false, "other section")
 	eq(m.on_item_use(make_item("medkit")), false, "other section")
 	eq(m.on_item_use(nil), false, "missing object")
-	eq(spy.opened, 0, "menu never opened")
+	eq(spy.shown, 0, "menu never opened")
 	eq(#spy.refusals, 0, "no refusal shown")
 end)
 
@@ -331,15 +338,69 @@ test("item use: refuses with a localized reason and keeps the menu closed", func
 	eq(m.on_item_use(make_item("soc_sleeping_bag")), true, "the use is handled even when refused")
 	eq(#spy.refusals, 1, "one refusal shown")
 	eq(spy.refusals[1], "st_soc_sleeping_bag_talking", "localized reason")
-	eq(spy.opened, 0, "menu never opened")
+	eq(spy.shown, 0, "menu never opened")
 end)
 
 test("item use: opens the menu only after eligibility succeeds", function()
 	local m = fresh()
 	local spy = make_menu_spy(m)
 	eq(m.on_item_use(make_item("soc_sleeping_bag")), true)
-	eq(spy.opened, 1, "menu opened once")
+	eq(spy.shown, 1, "menu opened once")
 	eq(#spy.refusals, 0, "no refusal shown")
+end)
+
+test("item use: skips a second open while the menu is visible", function()
+	local m = fresh()
+	local spy = make_menu_spy(m)
+	spy.open_flag = true
+	eq(m.on_item_use(make_item("soc_sleeping_bag")), true, "handled without action")
+	eq(spy.shown, 0, "menu not opened again")
+end)
+
+test("menu choice: starts the sleep with the chosen duration", function()
+	local m = fresh({ game_time = 0 })
+	local spy = make_menu_spy(m)
+	eq(m.on_item_use(make_item("soc_sleeping_bag")), true)
+	eq(#spy.choices, 1, "one choice callback")
+	spy.choices[1](3, false)
+	eq(m.mock.input_disabled, true, "input disabled by the chosen sleep")
+	eq(m.level.factor, 10000, "fast factor selected by the chosen sleep")
+	eq(mocks.count_calls(m, "level.disable_input"), 1, "one transition")
+end)
+
+test("menu cancel: returns to idle without touching engine state", function()
+	local m = fresh({ game_time = 0 })
+	local spy = make_menu_spy(m)
+	eq(m.on_item_use(make_item("soc_sleeping_bag")), true)
+	spy.choices[1](nil, false)
+	eq(m.mock.input_disabled, false, "input untouched")
+	eq(m.level.factor, 10, "factor untouched")
+	eq(spy.interrupted, 0, "a cancel is not an interruption")
+	-- The module is idle again and can start a fresh sleep.
+	eq(m.start_sleep(1, false), true)
+end)
+
+test("menu heal choice: sleeps the bounded healing duration", function()
+	local m = fresh({ game_time = 0, actor = { health = 0.5 } })
+	local spy = make_menu_spy(m)
+	eq(m.on_item_use(make_item("soc_sleeping_bag")), true)
+	spy.choices[1](5, true)
+	m.game_time = 5 * SLEEP_HOUR - 1
+	m.update(0)
+	eq(m.mock.input_disabled, true, "still sleeping near the healing deadline")
+	m.game_time = 5 * SLEEP_HOUR
+	m.update(0)
+	eq(m.db.actor.health, 1.0, "healed after the healing choice")
+end)
+
+test("hit abort: notifies the UI exactly once", function()
+	local m = fresh()
+	local spy = make_menu_spy(m)
+	eq(m.start_sleep(1, false), true)
+	m.on_actor_hit()
+	eq(spy.interrupted, 1, "one interruption notice")
+	m.on_actor_hit()
+	eq(spy.interrupted, 1, "no notice once idle")
 end)
 
 print(string.format("%d passed, %d failed", passed, failed))

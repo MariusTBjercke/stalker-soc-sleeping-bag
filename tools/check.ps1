@@ -27,6 +27,7 @@ $suites = @(
     [pscustomobject]@{ Name = 'deploy';    Path = 'tools\tests\deploy_test.ps1' },
     [pscustomobject]@{ Name = 'uninstall'; Path = 'tools\tests\uninstall_test.ps1' },
     [pscustomobject]@{ Name = 'gameplay';  Path = 'tools\tests\gameplay_test.ps1' },
+    [pscustomobject]@{ Name = 'ui';        Path = 'tools\tests\ui_test.ps1' },
     [pscustomobject]@{ Name = 'static';    Path = 'tools\tests\static_test.ps1' }
 )
 

@@ -103,17 +103,34 @@ local function spawn_bag(actor)
 	alife():create(ITEM_SECTION, actor:position(), actor:level_vertex_id(), actor:game_vertex_id())
 end
 
--- The menu module owns the window and the localized refusal message; both
--- calls are safe before that module exists.
+-- The menu module owns the window and the localized refusal message; every
+-- call below is safe before that module exists. The menu receives only the
+-- on_choice callback and never imports gameplay state.
+local function handle_menu_choice(hours, heal)
+	if hours == nil then
+		abort_sleep("menu_cancel")
+		return
+	end
+	start_sleep(hours, heal)
+end
+
 local function menu_open()
-	if soc_sleeping_bag_menu ~= nil and soc_sleeping_bag_menu.open ~= nil then
-		soc_sleeping_bag_menu.open(get_actor())
+	if soc_sleeping_bag_ui ~= nil and soc_sleeping_bag_ui.show ~= nil then
+		soc_sleeping_bag_ui.show(handle_menu_choice)
 	end
 end
 
 local function menu_show_refusal(reason_id)
-	if soc_sleeping_bag_menu ~= nil and soc_sleeping_bag_menu.show_refusal ~= nil then
-		soc_sleeping_bag_menu.show_refusal(reason_id)
+	if soc_sleeping_bag_ui ~= nil and soc_sleeping_bag_ui.show_refusal ~= nil then
+		soc_sleeping_bag_ui.show_refusal(reason_id)
+	end
+end
+
+-- A real interruption (hit or lost actor) tells the UI; a menu cancel does
+-- not.
+local function notify_interrupted()
+	if soc_sleeping_bag_ui ~= nil and soc_sleeping_bag_ui.show_interrupted ~= nil then
+		soc_sleeping_bag_ui.show_interrupted()
 	end
 end
 
@@ -214,9 +231,13 @@ end
 -- Spawn/load recovery: clears any stale transition first, then schedules the
 -- delayed inventory check so an interrupted sleep can never leak the fast
 -- factor or disabled input into a fresh session.
+local function schedule_provision()
+	provision_at_ms = get_time_ms() + PROVISION_DELAY_MS
+end
+
 function recover()
 	cleanup()
-	provision_at_ms = get_time_ms() + PROVISION_DELAY_MS
+	schedule_provision()
 end
 
 -- Starts a transition of `hours` in-game time; heals to full afterwards only
@@ -243,13 +264,15 @@ function start_sleep(hours, heal)
 	return true
 end
 
--- Aborts an active sleep without healing; harmless when nothing is active.
+-- Aborts an active sleep without healing, or returns an open menu to idle;
+-- harmless when nothing is active. A real interruption tells the UI.
 function abort_sleep(reason)
-	if state ~= STATE_SLEEPING then
-		return false
-	end
+	local was_sleeping = (state == STATE_SLEEPING)
 	cleanup()
-	return true
+	if was_sleeping then
+		notify_interrupted()
+	end
+	return was_sleeping
 end
 
 -- Completes an active sleep: heals first (when requested), then restores
@@ -289,7 +312,8 @@ end
 
 -- Returns false for items this mod does not own and true when the use is
 -- handled (opened the menu, or refused it with a localized reason). The menu
--- opens only after eligibility succeeds.
+-- opens only after eligibility succeeds. Every handled use schedules the
+-- delayed inventory check, because the engine consumes the used bag.
 function on_item_use(obj)
 	if obj == nil then
 		return false
@@ -298,8 +322,12 @@ function on_item_use(obj)
 	if section ~= ITEM_SECTION then
 		return false
 	end
+	if soc_sleeping_bag_ui ~= nil and soc_sleeping_bag_ui.is_open ~= nil and soc_sleeping_bag_ui.is_open() then
+		return true
+	end
 
 	local reason = eligibility_reason(get_actor(), get_time_ms())
+	schedule_provision()
 	if reason ~= nil then
 		menu_show_refusal(reason)
 		return true

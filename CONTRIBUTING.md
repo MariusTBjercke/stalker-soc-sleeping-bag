@@ -29,3 +29,12 @@ Use a lowercase type such as `feat`, `fix`, `docs`, `test`, `build`, or
 `chore`. Keep the summary concise and omit a trailing period. Put the version
 only in `VERSION`; move release notes from `Unreleased` into a dated
 `CHANGELOG.md` heading when releasing.
+
+## Localization status
+
+`gamedata/config/text/eng/st_soc_sleeping_bag.xml` holds the reviewed English
+strings. Every other EE locale folder carries the same English text as
+explicit fallback content, reviewed only by the authors, until a native
+speaker reviews it. Do not label that fallback as a translated locale; mark
+translation contributions as reviewed only after a fluent speaker checks the
+text for the game's tone and terminology.

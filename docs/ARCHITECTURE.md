@@ -41,6 +41,36 @@ Measured from the clean `resources/configs.db` members (task 6):
 - EE registers `callback.use_object`, `callback.death`, and `callback.hit`
   in `net_spawn` and clears them in `net_destroy`.
 
+### Verified UI and string-table facts
+
+Checked against the installed build's own definitions:
+
+- In-game dialogs use the button texture `ui_button_main01` with states
+  derived from the texture descriptor (`config/ui/carbody_new.xml`).
+- EE carries controller navigation sections (`ui_c_navi_*` with
+  `wnd_selector_info` chains) inside the same layout XML files.
+- String tables auto-load from `config/text/<locale>/*.xml`; the
+  `string_tables` list in `config/localization.ltx` is commented out, and
+  the loot-tracker mod ships `st_*.xml` tables on this build with no
+  localization registration.
+- The dialog lifecycle follows the engine's Lua UI pattern: a `class`
+  deriving from `CUIScriptWnd`, `CScriptXmlInit():ParseFile` with
+  `InitStatic`/`Init3tButton` plus `Register`, callbacks registered with
+  `ui_events.BUTTON_CLICKED`, shown through `level.start_stop_menu(dialog,
+  true)`, closed through the dialog holder, with Escape handled in
+  `OnKeyboard`.
+- `alife():create` accepts a fifth parent-id argument that spawns the item
+  directly into the parent's inventory; provisioning uses it.
+
+### Item restoration timing (probe pending)
+
+The engine consumes the used bag through the `II_ANTIR` eat path. The
+module therefore schedules the delayed inventory check on every handled use
+(1000 ms real time), after which `ensure_item` creates exactly one
+replacement bag or confirms one already exists. The order of consumption
+relative to `callback.use_object` remains a Task 8 runtime probe; the
+scheduled check is correct under either order.
+
 ### Verified item presentation provenance
 
 The item definition reuses verified EE-owned assets only:

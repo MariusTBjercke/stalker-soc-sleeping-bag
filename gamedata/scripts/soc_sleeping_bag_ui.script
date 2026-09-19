@@ -1,0 +1,165 @@
+-- Sleep menu: the dialog the player uses to pick a rest duration.
+-- Independently authored; the dialog lifecycle follows the verified EE
+-- CUIScriptWnd pattern (CScriptXmlInit + Register + AddCallback, shown
+-- through level.start_stop_menu and closed through the dialog holder).
+-- The gameplay module (soc_sleeping_bag) calls show(on_choice) after its
+-- eligibility checks pass; this module never imports gameplay state. The
+-- heal option reads the actor's engine health and asks the gameplay module
+-- only for its pure bounded calculation.
+
+local MENU_XML = "ui_soc_sleeping_bag.xml"
+
+local BUTTON_SLEEP_1 = "btn_sleep_1"
+local BUTTON_SLEEP_3 = "btn_sleep_3"
+local BUTTON_SLEEP_9 = "btn_sleep_9"
+local BUTTON_SLEEP_HEAL = "btn_sleep_heal"
+local BUTTON_CANCEL = "btn_cancel"
+
+local FIXED_CHOICES = {
+	[BUTTON_SLEEP_1] = { 1, false },
+	[BUTTON_SLEEP_3] = { 3, false },
+	[BUTTON_SLEEP_9] = { 9, false },
+}
+
+local dialog = nil
+
+-- The bounded healing duration for "Sleep until healed", computed from the
+-- actor's engine health through the gameplay module's pure calculation.
+function healing_duration()
+	local health = 1.0
+	local actor = db.actor
+	if actor ~= nil then
+		health = actor.health
+	end
+	return soc_sleeping_bag.healing_hours(health)
+end
+
+-- Returns the (hours, heal) payload for a button id: 1, 3, 9, or the
+-- calculated healing duration. Cancel carries no duration. Unknown buttons
+-- are ignored.
+function choice_for(button_id)
+	local fixed = FIXED_CHOICES[button_id]
+	if fixed ~= nil then
+		return fixed[1], fixed[2]
+	end
+	if button_id == BUTTON_SLEEP_HEAL then
+		return healing_duration(), true
+	end
+	if button_id == BUTTON_CANCEL then
+		return nil, false
+	end
+	return nil, nil
+end
+
+class "sleep_menu_dialog" (CUIScriptWnd)
+
+function sleep_menu_dialog:__init(owner, on_choice) super()
+	self.owner = owner
+	self.on_choice = on_choice
+	self:InitControls()
+	self:InitCallbacks()
+end
+
+function sleep_menu_dialog:__finalize() end
+
+function sleep_menu_dialog:button_ids()
+	return { BUTTON_SLEEP_1, BUTTON_SLEEP_3, BUTTON_SLEEP_9, BUTTON_SLEEP_HEAL, BUTTON_CANCEL }
+end
+
+function sleep_menu_dialog:InitControls()
+	-- Centered 300x300 panel in the engine's virtual UI space.
+	self:Init(362, 234, 300, 300)
+	local xml = CScriptXmlInit()
+	xml:ParseFile(MENU_XML)
+	xml:InitStatic("background", self)
+	xml:InitStatic("caption", self)
+	for _, button_id in ipairs(self:button_ids()) do
+		self:Register(xml:Init3tButton(button_id, self), button_id)
+	end
+end
+
+function sleep_menu_dialog:InitCallbacks()
+	self:AddCallback(BUTTON_SLEEP_1, ui_events.BUTTON_CLICKED, self.on_sleep_1, self)
+	self:AddCallback(BUTTON_SLEEP_3, ui_events.BUTTON_CLICKED, self.on_sleep_3, self)
+	self:AddCallback(BUTTON_SLEEP_9, ui_events.BUTTON_CLICKED, self.on_sleep_9, self)
+	self:AddCallback(BUTTON_SLEEP_HEAL, ui_events.BUTTON_CLICKED, self.on_sleep_heal, self)
+	self:AddCallback(BUTTON_CANCEL, ui_events.BUTTON_CLICKED, self.on_cancel, self)
+end
+
+function sleep_menu_dialog:choose(button_id)
+	local hours, heal = choice_for(button_id)
+	close()
+	if self.on_choice ~= nil then
+		self.on_choice(hours, heal)
+	end
+end
+
+function sleep_menu_dialog:on_sleep_1()
+	self:choose(BUTTON_SLEEP_1)
+end
+
+function sleep_menu_dialog:on_sleep_3()
+	self:choose(BUTTON_SLEEP_3)
+end
+
+function sleep_menu_dialog:on_sleep_9()
+	self:choose(BUTTON_SLEEP_9)
+end
+
+function sleep_menu_dialog:on_sleep_heal()
+	self:choose(BUTTON_SLEEP_HEAL)
+end
+
+function sleep_menu_dialog:on_cancel()
+	self:choose(BUTTON_CANCEL)
+end
+
+-- Escape closes without sleeping; directional keys keep engine focus
+-- handling (the layout chains the buttons through its ui_c_navi section).
+function sleep_menu_dialog:OnKeyboard(dik, keyboard_action)
+	CUIScriptWnd.OnKeyboard(self, dik, keyboard_action)
+	if keyboard_action == ui_events.WINDOW_KEY_PRESSED and dik == DIK_keys.DIK_ESCAPE then
+		self:choose(BUTTON_CANCEL)
+	end
+	return true
+end
+
+function sleep_menu_dialog:close()
+	self:GetHolder():start_stop_menu(self, true)
+end
+
+local function show_message(text)
+	if news_manager ~= nil and news_manager.send_tip ~= nil and db.actor ~= nil then
+		news_manager.send_tip(db.actor, text)
+	elseif printf ~= nil then
+		printf("soc_sleeping_bag_ui: %s", text)
+	end
+end
+
+function show(on_choice)
+	if is_open() then
+		return false
+	end
+	dialog = sleep_menu_dialog(get_hud(), on_choice)
+	level.start_stop_menu(dialog, true)
+	return true
+end
+
+function close()
+	if dialog ~= nil then
+		dialog:close()
+		dialog = nil
+	end
+end
+
+function show_refusal(string_id)
+	show_message(game.translate_string(string_id))
+end
+
+function show_interrupted()
+	show_message(game.translate_string("st_soc_sleeping_bag_interrupted"))
+end
+
+function is_open()
+	return dialog ~= nil
+end
