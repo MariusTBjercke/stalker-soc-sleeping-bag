@@ -14,9 +14,18 @@ Edition games, Anomaly, GAMMA, and Call of Chernobyl are outside support.
 
 The project uses loose files under the game's `gamedata` directory. It does
 not replace `fsgame_soc.ltx`, packed archives, or whole shared scripts. The
-future deployer materializes a missing shared file from the installed archive
-when necessary, then applies uniquely marked semantic edits. It defaults to
+deployer materializes a missing shared file from the installed archive when
+necessary (a pinned, hash-verified read; no external tools), then applies
+uniquely marked semantic edits. It defaults to
 dry-run and needs `-Apply` to write.
+
+The inventory icon needs one more shared file: the engine has no per-item
+icon setting and reads every icon from `ui\ui_icon_equipment`. The deployer
+installs `gamedata/textures/ui/ui_icon_equipment.dds`, built from the game's
+own copy with only the bag's icon cell changed (cells 2-3, rows 38-39, empty
+in the shipped texture). Another mod that ships its own version of that
+file conflicts: the deployer refuses to overwrite it. Icons from such a mod
+would have to be merged by hand.
 
 ## Coexistence
 
@@ -27,5 +36,7 @@ to overwrite the file.
 
 ## Distribution
 
-Steam Workshop distribution is excluded. The feature requires scripts and
-configuration files, and this project supports manual PC installation only.
+Release `0.1.0` is a manual-install ZIP with a checksum, published on
+GitHub. Steam Workshop distribution is not part of `0.1.0`: the mod patches
+two shared files and installs a rebuilt texture, which needs separate design
+work for a Workshop pack.

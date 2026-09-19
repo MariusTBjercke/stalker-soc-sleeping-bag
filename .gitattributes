@@ -6,3 +6,6 @@
 *.xml text eol=crlf
 *.md text eol=lf
 *.json text eol=lf
+*.png binary
+*.dxt5 binary
+*.dds binary

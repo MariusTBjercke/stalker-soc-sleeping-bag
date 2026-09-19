@@ -370,7 +370,14 @@ function Get-GameFileText {
     [CmdletBinding()]
     param([Parameter(Mandatory)][string] $Path)
 
-    $rawBytes = [IO.File]::ReadAllBytes($Path)
+    return ConvertFrom-GameFileBytes -Bytes ([IO.File]::ReadAllBytes($Path))
+}
+
+function ConvertFrom-GameFileBytes {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][byte[]] $Bytes)
+
+    $rawBytes = $Bytes
     if (($rawBytes.Length -ge 3) -and ($rawBytes[0] -eq 0xEF) -and ($rawBytes[1] -eq 0xBB) -and ($rawBytes[2] -eq 0xBF)) {
         return [pscustomobject]@{
             Text = [Text.Encoding]::UTF8.GetString($rawBytes, 3, $rawBytes.Length - 3)
@@ -425,8 +432,7 @@ function Get-EffectiveGameFile {
         [Parameter(Mandatory)][string] $GameDir,
         [Parameter(Mandatory)][string] $LooseRelativePath,
         [Parameter(Mandatory)][string] $ArchiveRelativePath,
-        [Parameter(Mandatory)][string] $SevenZipPath,
-        [Parameter(Mandatory)][string] $StageDir
+        $ArchiveEntry
     )
 
     $resolvedGameDir = [IO.Path]::GetFullPath($GameDir)
@@ -442,34 +448,19 @@ function Get-EffectiveGameFile {
         }
     }
 
-    if (-not (Test-Path -LiteralPath $SevenZipPath -PathType Leaf)) {
-        throw "7-Zip executable or script not found: $SevenZipPath"
+    # No loose copy: use the game's own file from its archive. Only the known,
+    # hash-pinned build can be read this way.
+    if ($null -eq $ArchiveEntry) {
+        throw "There is no loose copy of $LooseRelativePath and this game build has no verified archive entry for '$ArchiveRelativePath'."
     }
-    $archivePath = Resolve-ConfinedPath -Root $resolvedGameDir -RelativePath 'resources\configs.db'
-    if (-not (Test-Path -LiteralPath $archivePath -PathType Leaf)) {
-        throw "Game resource archive not found: $archivePath"
-    }
-
-    $resolvedStageDir = [IO.Path]::GetFullPath($StageDir)
-    New-Item -ItemType Directory -Path $resolvedStageDir -Force | Out-Null
-    $arguments = @('x', $archivePath, $ArchiveRelativePath, ('-o' + $resolvedStageDir), '-y')
-    & $SevenZipPath @arguments | Out-Null
-    if ($LASTEXITCODE -ne 0) {
-        throw "7-Zip failed to extract archive member '$ArchiveRelativePath' (exit code $LASTEXITCODE)."
-    }
-
-    $candidates = @(Get-ChildItem -LiteralPath $resolvedStageDir -Recurse -File)
-    if ($candidates.Count -ne 1) {
-        throw "Archive extraction for '$ArchiveRelativePath' must produce exactly one file; found $($candidates.Count)."
-    }
-
-    $decoded = Get-GameFileText -Path $candidates[0].FullName
+    $bytes = Read-ArchiveBytes -GameDir $resolvedGameDir -ArchiveEntry $ArchiveEntry -Description "The archive member '$ArchiveRelativePath'"
+    $decoded = ConvertFrom-GameFileBytes -Bytes $bytes
     return [pscustomobject]@{
         Text = $decoded.Text
         Encoding = $decoded.Encoding
         Origin = 'archive'
-        BaseHash = Get-Sha256 -Path $candidates[0].FullName
-        SourcePath = $archivePath + '::' + $ArchiveRelativePath
+        BaseHash = Get-BytesSha256 -Bytes $bytes
+        SourcePath = (Resolve-ConfinedPath -Root $resolvedGameDir -RelativePath ([string]$ArchiveEntry.archive)) + '::' + $ArchiveRelativePath
     }
 }
 
@@ -501,4 +492,110 @@ function Invoke-PatchManifest {
     }
 
     return $result
+}
+
+function Get-BytesSha256 {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][byte[]] $Bytes)
+
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try {
+        return (-join ($sha.ComputeHash($Bytes) | ForEach-Object { '{0:x2}' -f $_ }))
+    }
+    finally {
+        $sha.Dispose()
+    }
+}
+
+# Reads one file straight out of a game resource archive. The archives store
+# these files uncompressed, so a pinned offset and size are enough; the offset
+# is trusted only when the bytes match the pinned SHA-256 for the known build.
+function Read-ArchiveBytes {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string] $GameDir,
+        [Parameter(Mandatory)] $ArchiveEntry,
+        [Parameter(Mandatory)][string] $Description
+    )
+
+    $archivePath = Resolve-ConfinedPath -Root $GameDir -RelativePath ([string]$ArchiveEntry.archive)
+    if (-not (Test-Path -LiteralPath $archivePath -PathType Leaf)) {
+        throw "Game resource archive not found: $archivePath"
+    }
+    $length = [int]$ArchiveEntry.size
+    $bytes = New-Object byte[] $length
+    $stream = [IO.File]::OpenRead($archivePath)
+    try {
+        $stream.Seek([long]$ArchiveEntry.offset, [IO.SeekOrigin]::Begin) | Out-Null
+        $read = 0
+        while ($read -lt $length) {
+            $count = $stream.Read($bytes, $read, $length - $read)
+            if ($count -le 0) {
+                throw "$Description is beyond the end of $archivePath."
+            }
+            $read += $count
+        }
+    }
+    finally {
+        $stream.Dispose()
+    }
+    if ((Get-BytesSha256 -Bytes $bytes) -cne [string]$ArchiveEntry.sha256) {
+        throw "$Description inside $archivePath does not match the known build (expected SHA-256 $($ArchiveEntry.sha256))."
+    }
+    return , $bytes
+}
+
+function Get-ArchiveAtlas {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string] $GameDir,
+        [Parameter(Mandatory)] $AtlasInfo
+    )
+
+    return , (Read-ArchiveBytes -GameDir $GameDir -ArchiveEntry $AtlasInfo -Description 'The icon atlas')
+}
+
+# Copies the icon's pre-encoded DXT5 blocks into a copy of the DXT5 atlas at
+# the given grid cell. Every other byte of the atlas is left untouched.
+function Merge-AtlasBlocks {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][byte[]] $Atlas,
+        [Parameter(Mandatory)][byte[]] $Blocks,
+        [Parameter(Mandatory)][int] $CellX,
+        [Parameter(Mandatory)][int] $CellY,
+        [Parameter(Mandatory)][int] $CellSize,
+        [Parameter(Mandatory)][int] $IconWidth,
+        [Parameter(Mandatory)][int] $IconHeight
+    )
+
+    $headerSize = 128
+    $blockSize = 4
+    $blockBytes = 16
+    if (($Atlas.Length -lt $headerSize) -or ([Text.Encoding]::ASCII.GetString($Atlas, 0, 4) -cne 'DDS ') -or ([Text.Encoding]::ASCII.GetString($Atlas, 84, 4) -cne 'DXT5')) {
+        throw 'The icon atlas is not a DXT5 DDS file.'
+    }
+    $atlasHeight = [BitConverter]::ToUInt32($Atlas, 12)
+    $atlasWidth = [BitConverter]::ToUInt32($Atlas, 16)
+    $x = $CellX * $CellSize
+    $y = $CellY * $CellSize
+    if (($x % $blockSize) -or ($y % $blockSize) -or ($IconWidth % $blockSize) -or ($IconHeight % $blockSize)) {
+        throw 'The icon and its cell must be aligned to the 4 px DXT block grid.'
+    }
+    if ((($x + $IconWidth) -gt $atlasWidth) -or (($y + $IconHeight) -gt $atlasHeight)) {
+        throw 'The icon does not fit inside the atlas.'
+    }
+    $blocksPerRow = [int]($IconWidth / $blockSize)
+    $blockRows = [int]($IconHeight / $blockSize)
+    $rowBytes = $blocksPerRow * $blockBytes
+    if ($Blocks.Length -ne ($rowBytes * $blockRows)) {
+        throw "The icon block data has $($Blocks.Length) bytes; expected $($rowBytes * $blockRows)."
+    }
+    $atlasBlocksX = [int]($atlasWidth / $blockSize)
+    $result = [byte[]]$Atlas.Clone()
+    for ($row = 0; $row -lt $blockRows; $row++) {
+        $offset = $headerSize + ((([int]($y / $blockSize) + $row) * $atlasBlocksX) + [int]($x / $blockSize)) * $blockBytes
+        [Array]::Copy($Blocks, $row * $rowBytes, $result, $offset, $rowBytes)
+    }
+    return , $result
 }

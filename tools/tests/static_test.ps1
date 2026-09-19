@@ -77,7 +77,7 @@ Assert-LtxNumber -Values $item -Key 'cost' -Expected 0 -Message 'The item must c
 $architectureText = Get-Content -LiteralPath $architecturePath -Raw
 Assert-True -Condition ($architectureText.Contains('item_merger.ogf') -and $architectureText.Contains('[device_atifact_merger]')) -Message 'ARCHITECTURE.md must record the merger visual provenance.'
 Assert-True -Condition ($architectureText.Contains('[antirad]')) -Message 'ARCHITECTURE.md must record the antirad icon provenance.'
-foreach ($pair in @(@('inv_grid_x', '18'), @('inv_grid_y', '12'), @('inv_grid_width', '1'), @('inv_grid_height', '1'))) {
+foreach ($pair in @(@('inv_grid_x', '2'), @('inv_grid_y', '38'), @('inv_grid_width', '2'), @('inv_grid_height', '2'))) {
     Assert-True -Condition ($architectureText.Contains("$($pair[0]) = $($pair[1])")) -Message "ARCHITECTURE.md must record $($pair[0]) = $($pair[1]) as the reused icon coordinate."
     Assert-Equal -Expected $pair[1] -Actual $item[$pair[0]] -Message "The item's $($pair[0]) must equal the architecture-documented value."
 }
@@ -94,6 +94,27 @@ Assert-Equal -Expected 1 -Actual @($includePatch).Count -Message 'The system inc
 $expectedInclude = '#include "misc\soc_sleeping_bag.ltx" ; soc_sleeping_bag'
 Assert-Equal -Expected $expectedInclude -Actual $includePatch[0].line -Message 'The system include must use the exact owned LTX path.'
 Assert-True -Condition (Test-Path -LiteralPath (Join-Path $repoRoot 'gamedata\config\misc\soc_sleeping_bag.ltx') -PathType Leaf) -Message 'The included LTX path must exist as an owned file.'
+
+# The custom inventory icon: the item's grid cell and size must match the
+# atlas definition, and the shipped DXT5 block data must be exactly the size of
+# the icon (one 16 byte block per 4x4 px).
+$atlas = $manifest.atlas
+Assert-True -Condition ($null -ne $atlas) -Message 'The manifest must declare the icon atlas.'
+Assert-Equal -Expected ([string]$atlas.cell[0]) -Actual $item['inv_grid_x'] -Message 'The item inv_grid_x must be the atlas cell column.'
+Assert-Equal -Expected ([string]$atlas.cell[1]) -Actual $item['inv_grid_y'] -Message 'The item inv_grid_y must be the atlas cell row.'
+Assert-Equal -Expected ([string]([int]($atlas.iconWidth / $atlas.cellSize))) -Actual $item['inv_grid_width'] -Message 'The item width must cover the icon in grid cells.'
+Assert-Equal -Expected ([string]([int]($atlas.iconHeight / $atlas.cellSize))) -Actual $item['inv_grid_height'] -Message 'The item height must cover the icon in grid cells.'
+$blocksFile = Join-Path $repoRoot ([string]$atlas.blocks)
+Assert-True -Condition (Test-Path -LiteralPath $blocksFile -PathType Leaf) -Message 'The icon block data must exist.'
+Assert-Equal -Expected ([string]([int]($atlas.iconWidth / 4) * [int]($atlas.iconHeight / 4) * 16)) -Actual ([string](Get-Item -LiteralPath $blocksFile).Length) -Message 'The icon block data must be one DXT5 block per 4x4 px of the icon.'
+$knownBuilds = Get-Content -LiteralPath (Join-Path $repoRoot 'tools\known-builds.json') -Raw | ConvertFrom-Json
+foreach ($build in @($knownBuilds.builds)) {
+    foreach ($sharedFile in @($manifest.sharedFiles)) {
+        $pinned = $build.archiveFiles.PSObject.Properties[[string]$sharedFile.archivePath]
+        Assert-True -Condition ($null -ne $pinned) -Message "Known build $($build.executableVersion) must pin the archive entry for $($sharedFile.archivePath) (archive, offset, size, SHA-256)."
+    }
+    Assert-True -Condition ($null -ne $build.PSObject.Properties['atlas']) -Message "Known build $($build.executableVersion) must pin the icon atlas (archive, offset, size, SHA-256)."
+}
 
 $bindDefinition = @($manifest.sharedFiles | Where-Object { $_.path -eq 'gamedata/scripts/bind_stalker.script' })
 Assert-Equal -Expected 1 -Actual @($bindDefinition).Count -Message 'The manifest must patch bind_stalker.script exactly once.'

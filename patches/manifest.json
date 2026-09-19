@@ -54,5 +54,16 @@
         }
       ]
     }
-  ]
+  ],
+  "atlas": {
+    "path": "gamedata/textures/ui/ui_icon_equipment.dds",
+    "blocks": "art/icon/sleeping-bag-2x2.dxt5",
+    "cell": [
+      2,
+      38
+    ],
+    "cellSize": 50,
+    "iconWidth": 100,
+    "iconHeight": 100
+  }
 }

@@ -102,16 +102,22 @@ function New-UninstallFixture {
         Copy-Item -LiteralPath $uninstallSource -Destination (Join-Path $repo 'tools\uninstall.ps1')
     }
     Copy-Item -LiteralPath (Join-Path $sourceRoot 'tools\common.ps1') -Destination (Join-Path $repo 'tools\common.ps1')
-    Copy-Item -LiteralPath (Join-Path $sourceRoot 'tools\tests\fake_7z.ps1') -Destination (Join-Path $repo 'tools\tests\fake_7z.ps1')
     Copy-Item -LiteralPath (Join-Path $sourceRoot 'patches\manifest.json') -Destination (Join-Path $repo 'patches\manifest.json')
     Copy-Item -LiteralPath (Join-Path $sourceRoot 'VERSION') -Destination (Join-Path $repo 'VERSION')
 
     Write-Utf8Text -Path (Join-Path $repo 'gamedata\config\misc\owned-fixture.ltx') -Text "[owned_fixture]`r`nvalue = authored`r`n"
     Copy-Item -LiteralPath $powershellExe -Destination (Join-Path $game 'XR_3DA.exe')
     Write-Utf8Text -Path (Join-Path $game 'fsgame_soc.ltx') -Text "`$game_data`$ = true| true| `$fs_root`$| gamedata\`r`n"
-    Write-Utf8Text -Path (Join-Path $game 'resources\configs.db') -Text 'fixture archive'
-    Write-Utf8Text -Path (Join-Path $game 'resources\configs.db.contents\config\system.ltx') -Text $systemFixture
-    Write-Utf8Text -Path (Join-Path $game 'resources\configs.db.contents\scripts\bind_stalker.script') -Text $bindFixture
+    # A small binary stand-in for configs.db: the two shared files are stored
+    # uncompressed at pinned offsets, exactly like the real archive.
+    $systemBytes = [Text.UTF8Encoding]::new($false).GetBytes($systemFixture)
+    $bindBytes = [Text.UTF8Encoding]::new($false).GetBytes($bindFixture)
+    $systemOffset = 100
+    $bindOffset = $systemOffset + $systemBytes.Length + 50
+    $archiveBytes = New-Object byte[] ($bindOffset + $bindBytes.Length + 20)
+    [Array]::Copy($systemBytes, 0, $archiveBytes, $systemOffset, $systemBytes.Length)
+    [Array]::Copy($bindBytes, 0, $archiveBytes, $bindOffset, $bindBytes.Length)
+    [IO.File]::WriteAllBytes((Join-Path $game 'resources\configs.db'), $archiveBytes)
     if ($LooseSystem) {
         Write-Utf8Text -Path (Join-Path $game 'gamedata\config\system.ltx') -Text $systemFixture
     }
@@ -126,9 +132,9 @@ function New-UninstallFixture {
                 executableVersion = $executable.VersionInfo.FileVersion
                 steamBuild = 'fixture-build'
                 executableSha256 = (Get-FileHash -LiteralPath $executable.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-                files = [ordered]@{
-                    'config/system.ltx' = (Get-FileHash -LiteralPath (Join-Path $game 'resources\configs.db.contents\config\system.ltx') -Algorithm SHA256).Hash.ToLowerInvariant()
-                    'scripts/bind_stalker.script' = (Get-FileHash -LiteralPath (Join-Path $game 'resources\configs.db.contents\scripts\bind_stalker.script') -Algorithm SHA256).Hash.ToLowerInvariant()
+                archiveFiles = [ordered]@{
+                    'config/system.ltx' = [ordered]@{ archive = 'resources/configs.db'; offset = $systemOffset; size = $systemBytes.Length; sha256 = (Get-BytesSha256 -Bytes $systemBytes) }
+                    'scripts/bind_stalker.script' = [ordered]@{ archive = 'resources/configs.db'; offset = $bindOffset; size = $bindBytes.Length; sha256 = (Get-BytesSha256 -Bytes $bindBytes) }
                 }
             }
         )
@@ -136,7 +142,7 @@ function New-UninstallFixture {
     Write-Utf8Text -Path (Join-Path $repo 'tools\known-builds.json') -Text ($registry | ConvertTo-Json -Depth 8)
 
     # Initial deploy so the fixture is in an installed state
-    $deployArgs = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $repo 'tools\deploy.ps1'), '-GameDir', $game, '-SevenZipPath', (Join-Path $repo 'tools\tests\fake_7z.ps1'), '-Apply')
+    $deployArgs = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $repo 'tools\deploy.ps1'), '-GameDir', $game, '-Apply')
     & $powershellExe @deployArgs | Out-Null
     if ($LASTEXITCODE -ne 0) {
         throw "Initial deploy failed for test fixture $Name."

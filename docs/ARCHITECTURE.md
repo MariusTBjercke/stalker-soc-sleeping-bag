@@ -77,9 +77,14 @@ The item definition reuses verified EE-owned assets only:
 
 - Visual `equipments\item_merger.ogf`, taken from the clean
   `[device_atifact_merger]` section in `config/misc/devices.ltx`.
-- Icon grid `inv_grid_x = 18`, `inv_grid_y = 12`, `inv_grid_width = 1`,
-  `inv_grid_height = 1`, taken from the clean `[antirad]` section, the
-  reference `II_ANTIR` item in `config/misc/items.ltx`.
+- Icon grid `inv_grid_x = 2`, `inv_grid_y = 38`, `inv_grid_width = 2`,
+  `inv_grid_height = 2`: a custom 2x2 icon in `ui_icon_equipment.dds`
+  (1024x2048 DXT5, 50 px cells; the engine has no per-item icon setting).
+  Cells (2,38)-(3,39) are empty in the shipped atlas and 4 px block
+  aligned, so `tools/icon_atlas.py` splices only the icon's blocks into a
+  copy of the atlas and leaves every other byte as shipped. Version 0.1.0
+  first reused the `[antirad]` icon (18,12) from `config/misc/items.ltx`,
+  the reference `II_ANTIR` item.
 - `quest_item = true` is the EE quest-item property used throughout
   `config/misc/quest_items.ltx`.
 - `[identity_immunities]` is the shared base section inherited by vanilla

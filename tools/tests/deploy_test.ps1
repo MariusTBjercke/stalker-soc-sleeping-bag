@@ -98,16 +98,22 @@ function New-DeploymentFixture {
     New-Item -ItemType Directory -Path (Join-Path $repo 'tools\tests'), (Join-Path $repo 'patches'), (Join-Path $repo 'gamedata\config\misc'), (Join-Path $game 'resources') -Force | Out-Null
     Copy-Item -LiteralPath $deploySource -Destination (Join-Path $repo 'tools\deploy.ps1')
     Copy-Item -LiteralPath (Join-Path $sourceRoot 'tools\common.ps1') -Destination (Join-Path $repo 'tools\common.ps1')
-    Copy-Item -LiteralPath (Join-Path $sourceRoot 'tools\tests\fake_7z.ps1') -Destination (Join-Path $repo 'tools\tests\fake_7z.ps1')
     Copy-Item -LiteralPath (Join-Path $sourceRoot 'patches\manifest.json') -Destination (Join-Path $repo 'patches\manifest.json')
     Copy-Item -LiteralPath (Join-Path $sourceRoot 'VERSION') -Destination (Join-Path $repo 'VERSION')
 
     Write-Utf8Text -Path (Join-Path $repo 'gamedata\config\misc\owned-fixture.ltx') -Text "[owned_fixture]`r`nvalue = authored`r`n"
     Copy-Item -LiteralPath $powershellExe -Destination (Join-Path $game 'XR_3DA.exe')
     Write-Utf8Text -Path (Join-Path $game 'fsgame_soc.ltx') -Text "`$game_data`$ = true| true| `$fs_root`$| gamedata\`r`n"
-    Write-Utf8Text -Path (Join-Path $game 'resources\configs.db') -Text 'fixture archive'
-    Write-Utf8Text -Path (Join-Path $game 'resources\configs.db.contents\config\system.ltx') -Text $systemFixture
-    Write-Utf8Text -Path (Join-Path $game 'resources\configs.db.contents\scripts\bind_stalker.script') -Text $bindFixture
+    # A small binary stand-in for configs.db: the two shared files are stored
+    # uncompressed at pinned offsets, exactly like the real archive.
+    $systemBytes = [Text.UTF8Encoding]::new($false).GetBytes($systemFixture)
+    $bindBytes = [Text.UTF8Encoding]::new($false).GetBytes($bindFixture)
+    $systemOffset = 100
+    $bindOffset = $systemOffset + $systemBytes.Length + 50
+    $archiveBytes = New-Object byte[] ($bindOffset + $bindBytes.Length + 20)
+    [Array]::Copy($systemBytes, 0, $archiveBytes, $systemOffset, $systemBytes.Length)
+    [Array]::Copy($bindBytes, 0, $archiveBytes, $bindOffset, $bindBytes.Length)
+    [IO.File]::WriteAllBytes((Join-Path $game 'resources\configs.db'), $archiveBytes)
     if ($LooseSystem) {
         Write-Utf8Text -Path (Join-Path $game 'gamedata\config\system.ltx') -Text $systemFixture
     }
@@ -122,9 +128,9 @@ function New-DeploymentFixture {
                 executableVersion = $executable.VersionInfo.FileVersion
                 steamBuild = 'fixture-build'
                 executableSha256 = (Get-FileHash -LiteralPath $executable.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-                files = [ordered]@{
-                    'config/system.ltx' = (Get-FileHash -LiteralPath (Join-Path $game 'resources\configs.db.contents\config\system.ltx') -Algorithm SHA256).Hash.ToLowerInvariant()
-                    'scripts/bind_stalker.script' = (Get-FileHash -LiteralPath (Join-Path $game 'resources\configs.db.contents\scripts\bind_stalker.script') -Algorithm SHA256).Hash.ToLowerInvariant()
+                archiveFiles = [ordered]@{
+                    'config/system.ltx' = [ordered]@{ archive = 'resources/configs.db'; offset = $systemOffset; size = $systemBytes.Length; sha256 = (Get-BytesSha256 -Bytes $systemBytes) }
+                    'scripts/bind_stalker.script' = [ordered]@{ archive = 'resources/configs.db'; offset = $bindOffset; size = $bindBytes.Length; sha256 = (Get-BytesSha256 -Bytes $bindBytes) }
                 }
             }
         )
@@ -136,14 +142,13 @@ function New-DeploymentFixture {
         Repo = $repo
         Game = $game
         Deploy = Join-Path $repo 'tools\deploy.ps1'
-        SevenZip = Join-Path $repo 'tools\tests\fake_7z.ps1'
     }
 }
 
 function Invoke-Deploy {
     param([Parameter(Mandatory)] $Fixture, [switch] $Apply)
 
-    $arguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $Fixture.Deploy, '-GameDir', $Fixture.Game, '-SevenZipPath', $Fixture.SevenZip)
+    $arguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $Fixture.Deploy, '-GameDir', $Fixture.Game)
     if ($Apply) {
         $arguments += '-Apply'
     }
@@ -198,13 +203,19 @@ try {
     Assert-Match -Text $result.Output -Pattern 'origin=archive' -Message 'The plan must identify archive-derived shared files.'
     Assert-Match -Text (Get-Content -LiteralPath (Join-Path $fixture.Game 'gamedata\config\system.ltx') -Raw) -Pattern 'soc_sleeping_bag' -Message 'A missing loose file must be materialized and patched.'
 
-    $fixture = New-DeploymentFixture -Name 'missing-archive-member' -LooseSystem $false -LooseBind $false
-    Remove-Item -LiteralPath (Join-Path $fixture.Game 'resources\configs.db.contents\config\system.ltx') -Force
-    Assert-DeployFailedWithoutWrites -Fixture $fixture -Pattern 'Archive member not found|7-Zip failed'
+    $fixture = New-DeploymentFixture -Name 'tampered-archive-member' -LooseSystem $false -LooseBind $false
+    $archiveFile = Join-Path $fixture.Game 'resources\configs.db'
+    $archiveContent = [IO.File]::ReadAllBytes($archiveFile)
+    $archiveContent[120] = [byte]($archiveContent[120] -bxor 0xFF)
+    [IO.File]::WriteAllBytes($archiveFile, $archiveContent)
+    Assert-DeployFailedWithoutWrites -Fixture $fixture -Pattern 'does not match the known build'
 
-    $fixture = New-DeploymentFixture -Name 'multiple-archive-candidates' -LooseSystem $false -LooseBind $false
-    Write-Utf8Text -Path (Join-Path $fixture.Game 'resources\configs.db') -Text 'multiple candidates'
-    Assert-DeployFailedWithoutWrites -Fixture $fixture -Pattern 'exactly one file'
+    $fixture = New-DeploymentFixture -Name 'unpinned-archive-entry' -LooseSystem $false -LooseBind $false
+    $registryFile = Join-Path $fixture.Repo 'tools\known-builds.json'
+    $registryJson = Get-Content -LiteralPath $registryFile -Raw | ConvertFrom-Json
+    $registryJson.builds[0].PSObject.Properties.Remove('archiveFiles')
+    Write-Utf8Text -Path $registryFile -Text ($registryJson | ConvertTo-Json -Depth 8)
+    Assert-DeployFailedWithoutWrites -Fixture $fixture -Pattern 'There is no loose copy'
 
     $fixture = New-DeploymentFixture -Name 'idempotent'
     $first = Invoke-Deploy -Fixture $fixture -Apply
@@ -327,6 +338,100 @@ try {
     }
     $after = Get-TreeSnapshot -Root $fixture.Game
     Assert-SnapshotEqual -Expected $before -Actual $after -Message 'Rolled-back deployment must restore all files to pre-apply state when manifest is locked.'
+
+
+    # ---- icon atlas: built from the game's archive copy, verified, spliced ----
+    function New-AtlasFixture {
+        param([Parameter(Mandatory)][string] $Name)
+
+        $fixture = New-DeploymentFixture -Name $Name
+        # Synthetic 32x16 DXT5 atlas (8x4 blocks) stored inside a fake archive.
+        $atlas = New-Object byte[] (128 + 8 * 4 * 16)
+        [Text.Encoding]::ASCII.GetBytes('DDS ').CopyTo($atlas, 0)
+        [BitConverter]::GetBytes([uint32]16).CopyTo($atlas, 12)
+        [BitConverter]::GetBytes([uint32]32).CopyTo($atlas, 16)
+        [BitConverter]::GetBytes([uint32]1).CopyTo($atlas, 28)
+        [Text.Encoding]::ASCII.GetBytes('DXT5').CopyTo($atlas, 84)
+        for ($i = 128; $i -lt $atlas.Length; $i++) { $atlas[$i] = 0x11 }
+        $archive = New-Object byte[] (300 + $atlas.Length + 50)
+        [Array]::Copy($atlas, 0, $archive, 300, $atlas.Length)
+        [IO.File]::WriteAllBytes((Join-Path $fixture.Game 'resources\resources.db10'), $archive)
+
+        # A 2x2-block (8x8 px) icon placed at cell (1,1) of a 4 px grid.
+        $blocks = New-Object byte[] (2 * 2 * 16)
+        for ($i = 0; $i -lt $blocks.Length; $i++) { $blocks[$i] = 0xEE }
+        New-Item -ItemType Directory -Path (Join-Path $fixture.Repo 'art') -Force | Out-Null
+        [IO.File]::WriteAllBytes((Join-Path $fixture.Repo 'art\icon.dxt5'), $blocks)
+
+        $manifestFile = Join-Path $fixture.Repo 'patches\manifest.json'
+        $manifest = Get-Content -LiteralPath $manifestFile -Raw | ConvertFrom-Json
+        $manifest.atlas = [pscustomobject]@{ path = 'gamedata/textures/ui/ui_icon_equipment.dds'; blocks = 'art/icon.dxt5'; cell = @(1, 1); cellSize = 4; iconWidth = 8; iconHeight = 8 }
+        Write-Utf8Text -Path $manifestFile -Text ($manifest | ConvertTo-Json -Depth 8)
+
+        $registryFile = Join-Path $fixture.Repo 'tools\known-builds.json'
+        $registry = Get-Content -LiteralPath $registryFile -Raw | ConvertFrom-Json
+        $registry.builds[0] | Add-Member -NotePropertyName atlas -NotePropertyValue ([pscustomobject]@{ archive = 'resources/resources.db10'; offset = 300; size = $atlas.Length; sha256 = (Get-BytesSha256 -Bytes $atlas) })
+        Write-Utf8Text -Path $registryFile -Text ($registry | ConvertTo-Json -Depth 8)
+
+        return [pscustomobject]@{ Fixture = $fixture; Atlas = $atlas; Blocks = $blocks }
+    }
+
+    $case = New-AtlasFixture -Name 'atlas'
+    $fixture = $case.Fixture
+    $before = Get-TreeSnapshot -Root $fixture.Game
+    $result = Invoke-Deploy -Fixture $fixture
+    Assert-Equal -Expected 0 -Actual $result.ExitCode -Message "Atlas dry-run failed. Output: $($result.Output)"
+    Assert-Match -Text $result.Output -Pattern 'ATLAS gamedata/textures/ui/ui_icon_equipment\.dds' -Message 'The plan must report the atlas.'
+    Assert-SnapshotEqual -Expected $before -Actual (Get-TreeSnapshot -Root $fixture.Game) -Message 'Atlas dry-run must not write.'
+
+    $result = Invoke-Deploy -Fixture $fixture -Apply
+    Assert-Equal -Expected 0 -Actual $result.ExitCode -Message "Atlas apply failed. Output: $($result.Output)"
+    $installedAtlasPath = Join-Path $fixture.Game 'gamedata\textures\ui\ui_icon_equipment.dds'
+    $installedAtlas = [IO.File]::ReadAllBytes($installedAtlasPath)
+    Assert-Equal -Expected $case.Atlas.Length -Actual $installedAtlas.Length -Message 'The patched atlas must keep the vanilla size.'
+    $changed = @(0..($installedAtlas.Length - 1) | Where-Object { $installedAtlas[$_] -ne $case.Atlas[$_] })
+    Assert-Equal -Expected 64 -Actual $changed.Count -Message 'Only the icon blocks may differ from the vanilla atlas.'
+    # Cell (1,1) at 4 px is block column 1, block rows 1-2 of an 8-block-wide atlas.
+    Assert-Equal -Expected (128 + (1 * 8 + 1) * 16) -Actual $changed[0] -Message 'The icon must land at its cell.'
+    $deployedManifest = Get-Content -LiteralPath (Join-Path $fixture.Game 'gamedata\soc_sleeping_bag_deployed.json') -Raw | ConvertFrom-Json
+    $atlasRecord = @($deployedManifest.files | Where-Object { $_.relativePath -ceq 'gamedata/textures/ui/ui_icon_equipment.dds' })
+    Assert-Equal -Expected 1 -Actual $atlasRecord.Count -Message 'The deployment manifest must record the atlas.'
+    Assert-Equal -Expected 'owned' -Actual $atlasRecord[0].ownership -Message 'The atlas is mod-owned.'
+
+    # Redeploy over our own output is idempotent.
+    $hashBefore = (Get-FileHash -LiteralPath $installedAtlasPath -Algorithm SHA256).Hash
+    $result = Invoke-Deploy -Fixture $fixture -Apply
+    Assert-Equal -Expected 0 -Actual $result.ExitCode -Message "Atlas redeploy failed. Output: $($result.Output)"
+    Assert-Equal -Expected $hashBefore -Actual (Get-FileHash -LiteralPath $installedAtlasPath -Algorithm SHA256).Hash -Message 'Redeploy must be idempotent.'
+
+    # Uninstall removes the unchanged atlas, restoring the engine's archive copy.
+    $uninstall = Join-Path $sourceRoot 'tools\uninstall.ps1'
+    $previousPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        $uninstallText = (& $powershellExe -NoProfile -ExecutionPolicy Bypass -File $uninstall -GameDir $fixture.Game -Apply 2>&1 | Out-String)
+        $uninstallExit = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $previousPreference
+    }
+    Assert-Equal -Expected 0 -Actual $uninstallExit -Message "Atlas uninstall failed. Output: $uninstallText"
+    Assert-True -Condition (-not (Test-Path -LiteralPath $installedAtlasPath)) -Message 'Uninstall must remove the unchanged atlas.'
+
+    # A loose atlas from another mod is never overwritten.
+    $case = New-AtlasFixture -Name 'atlas-foreign'
+    $foreignPath = Join-Path $case.Fixture.Game 'gamedata\textures\ui\ui_icon_equipment.dds'
+    New-Item -ItemType Directory -Path (Split-Path -Parent $foreignPath) -Force | Out-Null
+    [IO.File]::WriteAllBytes($foreignPath, [byte[]](1, 2, 3, 4))
+    Assert-DeployFailedWithoutWrites -Fixture $case.Fixture -Pattern 'Another mod already provides'
+
+    # A vanilla atlas that does not match the pinned hash is rejected.
+    $case = New-AtlasFixture -Name 'atlas-mismatch'
+    $archiveFile = Join-Path $case.Fixture.Game 'resources\resources.db10'
+    $archiveBytes = [IO.File]::ReadAllBytes($archiveFile)
+    $archiveBytes[400] = 0x77
+    [IO.File]::WriteAllBytes($archiveFile, $archiveBytes)
+    Assert-DeployFailedWithoutWrites -Fixture $case.Fixture -Pattern 'does not match the known build'
 
     Write-Output 'PASS: merge-aware deployment contracts'
 }

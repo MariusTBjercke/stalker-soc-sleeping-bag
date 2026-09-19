@@ -2,7 +2,6 @@
 param(
     [string] $GameDir,
     [string] $ConfigPath,
-    [string] $SevenZipPath,
     [switch] $Apply
 )
 
@@ -47,12 +46,6 @@ if ([string]::IsNullOrWhiteSpace($GameDir)) {
     }
     $GameDir = [string]$configuration.steamGameDir
 }
-if ([string]::IsNullOrWhiteSpace($SevenZipPath)) {
-    if (($null -eq $configuration) -or [string]::IsNullOrWhiteSpace([string]$configuration.sevenZipPath)) {
-        throw '7-Zip path was not provided and config/local.json does not define sevenZipPath.'
-    }
-    $SevenZipPath = [string]$configuration.sevenZipPath
-}
 
 $resolvedGameDir = [IO.Path]::GetFullPath($GameDir)
 if (-not (Test-Path -LiteralPath $resolvedGameDir -PathType Container)) {
@@ -95,8 +88,12 @@ try {
     foreach ($fileDefinition in @($patchManifest.sharedFiles)) {
         $relativePath = [string]$fileDefinition.path
         $destinationPath = Resolve-ConfinedPath -Root $resolvedGameDir -RelativePath $relativePath
-        $extractionRoot = Join-Path $stagingRoot ('extract-' + [guid]::NewGuid().ToString('N'))
-        $effective = Get-EffectiveGameFile -GameDir $resolvedGameDir -LooseRelativePath $relativePath -ArchiveRelativePath $fileDefinition.archivePath -SevenZipPath $SevenZipPath -StageDir $extractionRoot
+        $archiveEntry = $null
+        if (($null -ne $knownBuild) -and ($null -ne $knownBuild.PSObject.Properties['archiveFiles'])) {
+            $entryProperty = $knownBuild.archiveFiles.PSObject.Properties[[string]$fileDefinition.archivePath]
+            if ($null -ne $entryProperty) { $archiveEntry = $entryProperty.Value }
+        }
+        $effective = Get-EffectiveGameFile -GameDir $resolvedGameDir -LooseRelativePath $relativePath -ArchiveRelativePath $fileDefinition.archivePath -ArchiveEntry $archiveEntry
         if ($null -eq $fileDefinition.PSObject.Properties['marker']) {
             $fileDefinition | Add-Member -NotePropertyName marker -NotePropertyValue $patchManifest.marker
         }
@@ -142,6 +139,62 @@ try {
                     destinationPath = $destinationPath
                     existed = Test-Path -LiteralPath $destinationPath -PathType Leaf
                     action = 'COPY'
+                })
+        }
+    }
+
+    # The inventory icon lives inside EE's shared icon atlas. The atlas is built
+    # from the game's own copy (read from its archive and verified by hash) with
+    # only the icon's blocks replaced, then installed as a mod-owned loose file.
+    $atlasProperty = $patchManifest.PSObject.Properties['atlas']
+    if ($null -ne $atlasProperty) {
+        $atlasDefinition = $atlasProperty.Value
+        $knownAtlas = if (($null -ne $knownBuild) -and ($null -ne $knownBuild.PSObject.Properties['atlas'])) { $knownBuild.atlas } else { $null }
+        if ($null -eq $knownAtlas) {
+            Write-Warning 'No verified icon atlas is known for this build; the sleeping bag will keep no custom icon.'
+        }
+        else {
+            $blocksPath = Resolve-ConfinedPath -Root $repoRoot -RelativePath ([string]$atlasDefinition.blocks)
+            if (-not (Test-Path -LiteralPath $blocksPath -PathType Leaf)) {
+                throw "Icon block data not found: $blocksPath"
+            }
+            $vanillaAtlas = Get-ArchiveAtlas -GameDir $resolvedGameDir -AtlasInfo $knownAtlas
+            $patchedAtlas = Merge-AtlasBlocks -Atlas $vanillaAtlas -Blocks ([IO.File]::ReadAllBytes($blocksPath)) `
+                -CellX ([int]$atlasDefinition.cell[0]) -CellY ([int]$atlasDefinition.cell[1]) -CellSize ([int]$atlasDefinition.cellSize) `
+                -IconWidth ([int]$atlasDefinition.iconWidth) -IconHeight ([int]$atlasDefinition.iconHeight)
+            $patchedHash = Get-BytesSha256 -Bytes $patchedAtlas
+
+            $atlasRelativePath = [string]$atlasDefinition.path
+            $atlasDestination = Resolve-ConfinedPath -Root $resolvedGameDir -RelativePath $atlasRelativePath
+            $atlasExisted = Test-Path -LiteralPath $atlasDestination -PathType Leaf
+            if ($atlasExisted) {
+                # Only overwrite a loose atlas that is the vanilla one or our own
+                # earlier output; anything else belongs to another mod.
+                $existingHash = Get-Sha256 -Path $atlasDestination
+                $ours = ($existingHash -ceq [string]$knownAtlas.sha256) -or ($existingHash -ceq $patchedHash)
+                $priorManifestPath = Resolve-ConfinedPath -Root $resolvedGameDir -RelativePath 'gamedata\soc_sleeping_bag_deployed.json'
+                if ((-not $ours) -and (Test-Path -LiteralPath $priorManifestPath -PathType Leaf)) {
+                    $prior = Get-Content -LiteralPath $priorManifestPath -Raw | ConvertFrom-Json
+                    $ours = @($prior.files | Where-Object { ([string]$_.relativePath -ceq $atlasRelativePath) -and ([string]$_.installedHash -ceq $existingHash) }).Count -gt 0
+                }
+                if (-not $ours) {
+                    throw "Another mod already provides $atlasRelativePath. Refusing to replace it; remove that mod's atlas or install this mod without the custom icon."
+                }
+            }
+            $stagedAtlasPath = Resolve-ConfinedPath -Root $payloadRoot -RelativePath $atlasRelativePath
+            New-Item -ItemType Directory -Path (Split-Path -Parent $stagedAtlasPath) -Force | Out-Null
+            [IO.File]::WriteAllBytes($stagedAtlasPath, $patchedAtlas)
+            $installedFiles.Add([pscustomobject]@{
+                    relativePath = $atlasRelativePath.Replace('\', '/')
+                    ownership = 'owned'
+                    sourceOrigin = 'archive'
+                    sourcePath = $blocksPath
+                    baseHash = [string]$knownAtlas.sha256
+                    installedHash = $patchedHash
+                    stagedPath = $stagedAtlasPath
+                    destinationPath = $atlasDestination
+                    existed = $atlasExisted
+                    action = 'ATLAS'
                 })
         }
     }

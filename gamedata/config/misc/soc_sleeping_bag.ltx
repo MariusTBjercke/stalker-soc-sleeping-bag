@@ -1,7 +1,7 @@
 ;; Sleeping Bag: the reusable inventory item that opens the sleep menu.
 ;; Independently authored for this mod. It inherits the same base section as
-;; every vanilla device and uses only verified EE-owned presentation assets:
-;; the merger visual and the antirad icon grid (see docs/ARCHITECTURE.md).
+;; every vanilla device. The visual is EE's merger model; the 2x2 icon sits in
+;; cell (2,38) of ui_icon_equipment.dds (see docs/ARCHITECTURE.md).
 ;; The item is consumed by the engine on use; the gameplay module provisions
 ;; a replacement after the menu action finishes.
 
@@ -18,10 +18,10 @@ inv_name			= st_soc_sleeping_bag_name
 inv_name_short			= st_soc_sleeping_bag_name
 inv_weight			= 1.2
 
-inv_grid_width			= 1
-inv_grid_height			= 1
-inv_grid_x			= 18
-inv_grid_y			= 12
+inv_grid_width			= 2
+inv_grid_height			= 2
+inv_grid_x			= 2
+inv_grid_y			= 38
 cost				= 0
 quest_item			= true
 

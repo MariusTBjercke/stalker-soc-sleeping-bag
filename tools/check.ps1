@@ -17,6 +17,7 @@ $policyViolations = @($tracked | Where-Object {
         $_ -eq 'config/local.json' -or
         $_ -like 'out/*' -or
         $_ -like 'dist/*' -or
+        $_ -like '*.dds' -or
         (($_ -like 'references/*') -and ($_ -ne 'references/README.md'))
     })
 $policyStatus = if (@($policyViolations).Count -eq 0) { 'PASS' } else { 'FAIL' }
