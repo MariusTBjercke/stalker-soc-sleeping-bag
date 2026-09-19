@@ -21,6 +21,11 @@ local ITEM_SECTION = "soc_sleeping_bag"
 -- The engine's established fast-forward factor and the configured normal one.
 local FAST_TIME_FACTOR = 10000
 local FALLBACK_TIME_FACTOR = 10
+-- Safety net: a sleep still running after this much real time is aborted.
+-- The longest sleep takes a few real seconds at the fast factor.
+local SLEEP_TIMEOUT_MS = 60000
+-- Health loss beyond this during a sleep aborts it (ignores float noise).
+local HEALTH_LOSS_EPSILON = 0.001
 -- No sleep for this long after the last hit callback fired.
 local RECENT_HIT_MS = 10000
 -- Matches EE's existing severe-radiation warning threshold.
@@ -40,7 +45,12 @@ local state = STATE_IDLE
 local captured_factor = nil
 local input_disabled = false
 local weapon_hidden = false
-local sleep_deadline = nil
+local sleep_started = nil
+local sleep_seconds = nil
+-- Actor health when the sleep began; a drop below it aborts the sleep.
+local sleep_start_health = nil
+-- Real-time ms after which a sleep that never finishes is aborted.
+local sleep_timeout_ms = nil
 local heal_on_complete = false
 -- Real-time ms of the last actor hit, per the EE hit callback.
 local last_hit_ms = nil
@@ -56,8 +66,14 @@ local function get_time_ms()
 	return time_global()
 end
 
-local function get_game_seconds()
+-- game.get_game_time() returns a CTime object, never a number: elapsed game
+-- seconds come from CTime:diffSec.
+local function get_game_time()
 	return game.get_game_time()
+end
+
+local function elapsed_game_seconds(since)
+	return game.get_game_time():diffSec(since)
 end
 
 local function get_time_factor()
@@ -224,7 +240,10 @@ function cleanup()
 		weapon_hidden = false
 	end
 	state = STATE_IDLE
-	sleep_deadline = nil
+	sleep_started = nil
+	sleep_seconds = nil
+	sleep_start_health = nil
+	sleep_timeout_ms = nil
 	heal_on_complete = false
 	log_debug("cleanup finished")
 end
@@ -266,15 +285,29 @@ function start_sleep(hours, heal)
 	end
 
 	local clamped = math.max(1, math.min(9, math.ceil(hours or 1)))
-	captured_factor = get_time_factor()
-	disable_input()
-	input_disabled = true
-	hide_weapon()
-	weapon_hidden = true
-	set_time_factor(FAST_TIME_FACTOR)
-	sleep_deadline = get_game_seconds() + clamped * SECONDS_PER_HOUR
-	heal_on_complete = (heal == true)
-	state = STATE_SLEEPING
+	-- Everything that can fail is read before any engine state changes; if a
+	-- later step still errors, cleanup restores what was changed so the fast
+	-- factor can never leak.
+	local started = get_game_time()
+	local ok, err = pcall(function()
+		captured_factor = get_time_factor()
+		sleep_started = started
+		sleep_start_health = actor.health
+		sleep_seconds = clamped * SECONDS_PER_HOUR
+		sleep_timeout_ms = get_time_ms() + SLEEP_TIMEOUT_MS
+		heal_on_complete = (heal == true)
+		disable_input()
+		input_disabled = true
+		hide_weapon()
+		weapon_hidden = true
+		set_time_factor(FAST_TIME_FACTOR)
+		state = STATE_SLEEPING
+	end)
+	if not ok then
+		printf("soc_sleeping_bag: start_sleep failed: %s", tostring(err))
+		cleanup()
+		return false
+	end
 	log_debug("sleep started: hours=" .. tostring(clamped) .. " heal=" .. tostring(heal == true))
 	return true
 end
@@ -375,7 +408,27 @@ function update(delta)
 		return
 	end
 
-	if sleep_deadline ~= nil and get_game_seconds() >= sleep_deadline then
+	-- Hunger, radiation, or bleeding drain health per game second, and the
+	-- sleep fast-forwards thousands of them: stop before they can kill.
+	if sleep_start_health ~= nil and actor.health < sleep_start_health - HEALTH_LOSS_EPSILON then
+		abort_sleep("health_loss")
+		return
+	end
+
+	if sleep_timeout_ms ~= nil and get_time_ms() >= sleep_timeout_ms then
+		abort_sleep("timeout")
+		return
+	end
+
+	-- A failing time read must end the sleep instead of leaving the fast
+	-- factor and disabled input in place.
+	local ok, elapsed = pcall(elapsed_game_seconds, sleep_started)
+	if not ok then
+		printf("soc_sleeping_bag: game time read failed: %s", tostring(elapsed))
+		abort_sleep("time_error")
+		return
+	end
+	if sleep_seconds ~= nil and elapsed >= sleep_seconds then
 		finish_sleep()
 	end
 end

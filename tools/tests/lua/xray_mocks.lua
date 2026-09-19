@@ -39,7 +39,16 @@ function M.new_env(opts)
 	env.game = {
 		get_game_time = function()
 			record("game.get_game_time")
-			return env.game_time
+			-- The engine returns a CTime object: no arithmetic or numeric
+			-- comparison, only diffSec.
+			local now = env.game_time
+			return setmetatable({ seconds = now }, {
+				__index = {
+					diffSec = function(self, other)
+						return self.seconds - other.seconds
+					end,
+				},
+			})
 		end,
 	}
 

@@ -67,11 +67,12 @@ function sleep_menu_dialog:button_ids()
 end
 
 function sleep_menu_dialog:InitControls()
-	-- Centered 300x300 panel in the engine's virtual UI space.
-	self:Init(362, 234, 300, 300)
+	-- Full-screen window in the 1024x768 UI space, like EE dialogs; the layout
+	-- places the panel and buttons with absolute coordinates.
+	self:Init(0, 0, 1024, 768)
 	local xml = CScriptXmlInit()
 	xml:ParseFile(MENU_XML)
-	xml:InitStatic("background", self)
+	xml:InitFrame("panel", self)
 	xml:InitStatic("caption", self)
 	for _, button_id in ipairs(self:button_ids()) do
 		self:Register(xml:Init3tButton(button_id, self), button_id)

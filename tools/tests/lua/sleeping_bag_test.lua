@@ -234,6 +234,24 @@ test("hit during sleep: aborts without healing", function()
 	eq(m.db.actor.health, 0.5, "aborted sleep must not heal")
 end)
 
+test("update: aborts without healing when health drains during sleep", function()
+	local m = fresh({ game_time = 0, actor = { health = 0.5 } })
+	eq(m.start_sleep(9, true), true)
+	m.db.actor.health = 0.4
+	m.update(0)
+	eq(m.level.factor, 10, "health loss restored the factor")
+	eq(m.mock.input_disabled, false, "health loss re-enabled input")
+	eq(m.db.actor.health, 0.4, "health loss must not heal")
+end)
+
+test("update: rising health does not abort the sleep", function()
+	local m = fresh({ game_time = 0, actor = { health = 0.5 } })
+	eq(m.start_sleep(1, false), true)
+	m.db.actor.health = 0.6
+	m.update(0)
+	eq(m.level.factor, 10000, "sleep continues")
+end)
+
 test("update: aborts when the actor dies during sleep", function()
 	local m = fresh({ game_time = 0 })
 	eq(m.start_sleep(1, false), true)

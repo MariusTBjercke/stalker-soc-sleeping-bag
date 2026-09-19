@@ -1,33 +1,37 @@
 <?xml version="1.0" encoding="windows-1251" ?>
 <!-- Sleep menu layout, independently authored for this mod.
-     Button texture ui_button_main01 is the verified EE in-game button
-     texture (config/ui/carbody_new.xml). The ui_c_navi section chains the
-     five buttons for EE controller navigation. Text values are string IDs
-     resolved from config/text/<locale>/st_soc_sleeping_bag.xml. -->
+     Follows the layout pattern of EE's own dialogs: the script window covers
+     the full 1024x768 UI space and every control has absolute coordinates in
+     it (compare slider_box in inventory_new.xml, buttons in carbody_new.xml).
+     Buttons use the verified EE button texture ui_button_main01 at its
+     vanilla 157x48 size; the panel is a frame using ui_tablist_textbox. The
+     ui_c_navi section chains the five buttons for EE controller navigation.
+     Text values are string IDs resolved from
+     config/text/<locale>/st_soc_sleeping_bag.xml. -->
 <sleep_ui>
-	<background x="0" y="0" width="300" height="300" stretch="1">
-		<texture>ui\ui_dg_inventory</texture>
-	</background>
-	<caption x="0" y="8" width="300" height="30">
+	<panel x="362" y="199" width="300" height="386">
+		<texture>ui_tablist_textbox</texture>
+	</panel>
+	<caption x="362" y="226" width="300" height="30">
 		<text align="c" font="graffiti22" r="238" g="155" b="23">st_soc_sleeping_bag_title</text>
 	</caption>
-	<btn_sleep_1 x="90" y="56" width="120" height="30" stretch="1">
+	<btn_sleep_1 x="433" y="272" width="157" height="48" hR="255" hB="83" hG="179" highlight_text="1">
 		<texture>ui_button_main01</texture>
 		<text align="c" font="graffiti22" r="238" g="153" b="26">st_soc_sleeping_bag_sleep_1</text>
 	</btn_sleep_1>
-	<btn_sleep_3 x="90" y="94" width="120" height="30" stretch="1">
+	<btn_sleep_3 x="433" y="328" width="157" height="48" hR="255" hB="83" hG="179" highlight_text="1">
 		<texture>ui_button_main01</texture>
 		<text align="c" font="graffiti22" r="238" g="153" b="26">st_soc_sleeping_bag_sleep_3</text>
 	</btn_sleep_3>
-	<btn_sleep_9 x="90" y="132" width="120" height="30" stretch="1">
+	<btn_sleep_9 x="433" y="384" width="157" height="48" hR="255" hB="83" hG="179" highlight_text="1">
 		<texture>ui_button_main01</texture>
 		<text align="c" font="graffiti22" r="238" g="153" b="26">st_soc_sleeping_bag_sleep_9</text>
 	</btn_sleep_9>
-	<btn_sleep_heal x="90" y="170" width="120" height="30" stretch="1">
+	<btn_sleep_heal x="433" y="440" width="157" height="48" hR="255" hB="83" hG="179" highlight_text="1">
 		<texture>ui_button_main01</texture>
 		<text align="c" font="graffiti22" r="238" g="153" b="26">st_soc_sleeping_bag_sleep_heal</text>
 	</btn_sleep_heal>
-	<btn_cancel x="90" y="226" width="120" height="30" stretch="1">
+	<btn_cancel x="433" y="512" width="157" height="48" hR="255" hB="83" hG="179" highlight_text="1">
 		<texture>ui_button_main01</texture>
 		<text align="c" font="graffiti22" r="238" g="153" b="26">st_soc_sleeping_bag_cancel</text>
 	</btn_cancel>

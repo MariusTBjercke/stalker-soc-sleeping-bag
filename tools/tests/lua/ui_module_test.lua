@@ -106,6 +106,10 @@ local function new_env()
 			table.insert(mock.xml_inits, { kind = "static", id = id })
 			return { id = id }
 		end
+		function xml:InitFrame(id, owner)
+			table.insert(mock.xml_inits, { kind = "frame", id = id })
+			return { id = id }
+		end
 		function xml:Init3tButton(id, owner)
 			table.insert(mock.xml_inits, { kind = "button", id = id })
 			return { id = id }
@@ -160,8 +164,10 @@ test("show: parses the owned layout and registers each button once", function()
 	local env = load_module(new_env())
 	eq(env.show(function() end), true)
 	eq(env.mock.parsed_file, "ui_soc_sleeping_bag.xml", "layout file")
-	eq(env.mock.dialog_rect.x, 362, "centered x")
-	eq(env.mock.dialog_rect.y, 234, "centered y")
+	eq(env.mock.dialog_rect.x, 0, "full-screen x")
+	eq(env.mock.dialog_rect.y, 0, "full-screen y")
+	eq(env.mock.dialog_rect.width, 1024, "full-screen width")
+	eq(env.mock.dialog_rect.height, 768, "full-screen height")
 	local buttons = 0
 	for _, init in ipairs(env.mock.xml_inits) do
 		if init.kind == "button" then
