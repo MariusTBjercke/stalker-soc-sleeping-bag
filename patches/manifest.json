@@ -20,37 +20,37 @@
         {
           "kind": "luaFunction",
           "function": "function actor_binder:net_spawn(data)",
-          "anchor": "death_manager.init_drop_settings()",
+          "anchor": "\tdeath_manager.init_drop_settings()",
           "position": "After",
-          "line": "    soc_sleeping_bag.on_actor_net_spawn() -- soc_sleeping_bag"
+          "line": "\tsoc_sleeping_bag.on_actor_net_spawn() -- soc_sleeping_bag"
         },
         {
           "kind": "luaFunction",
           "function": "function actor_binder:net_destroy()",
-          "anchor": "self.bCheckStart = false",
+          "anchor": "\tobject_binder.net_destroy(self)",
           "position": "After",
-          "line": "    soc_sleeping_bag.on_actor_net_destroy() -- soc_sleeping_bag"
+          "line": "\tsoc_sleeping_bag.on_actor_net_destroy() -- soc_sleeping_bag"
         },
         {
           "kind": "luaFunction",
           "function": "function actor_binder:use_inventory_item(obj)",
-          "anchor": "local obj_section = obj:section()",
+          "anchor": "\tif(obj) then",
           "position": "After",
-          "line": "    soc_sleeping_bag.on_item_use(obj) -- soc_sleeping_bag"
+          "line": "\t\tsoc_sleeping_bag.on_item_use(obj) -- soc_sleeping_bag"
         },
         {
           "kind": "luaFunction",
           "function": "function actor_binder:hit_callback(obj, amount, local_direction, who, bone_index)",
-          "anchor": "local hitted_by = who and who:id()",
-          "position": "After",
-          "line": "    soc_sleeping_bag.on_actor_hit() -- soc_sleeping_bag"
+          "anchor": "\t-- MTB-Damian.Romanik [JUD-1117] Start: Make sure who is present",
+          "position": "Before",
+          "line": "\tsoc_sleeping_bag.on_actor_hit() -- soc_sleeping_bag"
         },
         {
           "kind": "luaFunction",
           "function": "function actor_binder:update(delta)",
-          "anchor": "object_binder.update(self, delta)",
+          "anchor": "\tobject_binder.update(self, delta)",
           "position": "After",
-          "line": "    soc_sleeping_bag.update(delta) -- soc_sleeping_bag"
+          "line": "\tsoc_sleeping_bag.update(delta) -- soc_sleeping_bag"
         }
       ]
     }

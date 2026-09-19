@@ -37,15 +37,15 @@ Assert-Equal -Expected $beforeExpected -Actual $before -Message 'A unique anchor
 $trailingWhitespace = Add-MarkedLine -Text ([String]::Join("`r`n", @('anchor   ', '')) ) -Anchor 'anchor' -Line 'owned ; soc_sleeping_bag' -Marker $marker
 Assert-Equal -Expected ([String]::Join("`r`n", @('anchor   ', 'owned ; soc_sleeping_bag', ''))) -Actual $trailingWhitespace -Message 'Anchor matching must ignore only trailing whitespace.'
 
-$scoped = Add-MarkedLineInFunction -Text $bindClean -FunctionSignature 'function actor_binder:net_spawn(data)' -Anchor 'death_manager.init_drop_settings()' -Line '    soc_sleeping_bag.on_actor_net_spawn() -- soc_sleeping_bag' -Marker $marker -Position After
-Assert-Match -Text $scoped -Pattern '(?s)function actor_binder:net_spawn\(data\).*?death_manager\.init_drop_settings\(\)\r\n    soc_sleeping_bag\.on_actor_net_spawn\(\) -- soc_sleeping_bag' -Message 'A Lua function patch must add the hook inside the selected function.'
-Assert-Match -Text $scoped -Pattern '(?s)function actor_binder:unrelated\(\)\r\ndeath_manager\.init_drop_settings\(\)\r\nend' -Message 'An anchor outside the selected Lua function must remain untouched.'
+$scoped = Add-MarkedLineInFunction -Text $bindClean -FunctionSignature 'function actor_binder:net_spawn(data)' -Anchor "`tdeath_manager.init_drop_settings()" -Line "`tsoc_sleeping_bag.on_actor_net_spawn() -- soc_sleeping_bag" -Marker $marker -Position After
+Assert-Match -Text $scoped -Pattern '(?s)function actor_binder:net_spawn\(data\).*?death_manager\.init_drop_settings\(\)\r\n\tsoc_sleeping_bag\.on_actor_net_spawn\(\) -- soc_sleeping_bag' -Message 'A Lua function patch must add the hook inside the selected function.'
+Assert-Match -Text $scoped -Pattern '(?s)function actor_binder:unrelated\(\)\r\n\tdeath_manager\.init_drop_settings\(\)\r\nend' -Message 'An anchor outside the selected Lua function must remain untouched.'
 
-$updated = Add-MarkedLineInFunction -Text $bindModified -FunctionSignature 'function actor_binder:net_spawn(data)' -Anchor 'death_manager.init_drop_settings()' -Line '    soc_sleeping_bag.on_actor_net_spawn() -- soc_sleeping_bag' -Marker $marker -Position After
+$updated = Add-MarkedLineInFunction -Text $bindModified -FunctionSignature 'function actor_binder:net_spawn(data)' -Anchor "`tdeath_manager.init_drop_settings()" -Line "`tsoc_sleeping_bag.on_actor_net_spawn() -- soc_sleeping_bag" -Marker $marker -Position After
 Assert-Match -Text $updated -Pattern 'repair_dialog\.enable\(\) -- unrelated repair mod line' -Message 'Updating a marked line must preserve an unrelated repair line.'
 Assert-Match -Text $updated -Pattern 'loot_tracker\.on_spawn\(\) -- loot_tracker' -Message 'Updating a marked line must preserve an unrelated loot-tracker line.'
 Assert-True -Condition ($updated -notmatch 'old_spawn_hook') -Message 'An existing marked line must be updated in place.'
-Assert-Match -Text $updated -Pattern 'repair_dialog\.enable\(\) -- unrelated repair mod line\r\n    soc_sleeping_bag\.on_actor_net_spawn\(\) -- soc_sleeping_bag\r\n    loot_tracker\.on_spawn\(\) -- loot_tracker' -Message 'Updating a marked line must preserve its surrounding position.'
+Assert-Match -Text $updated -Pattern 'repair_dialog\.enable\(\) -- unrelated repair mod line\r\n\tsoc_sleeping_bag\.on_actor_net_spawn\(\) -- soc_sleeping_bag\r\n    loot_tracker\.on_spawn\(\) -- loot_tracker' -Message 'Updating a marked line must preserve its surrounding position.'
 
 Assert-Match -Text $before -Pattern "`r`n" -Message 'Inserted output must use CRLF line endings.'
 Assert-True -Condition ($before -notmatch '(?<!\r)\n') -Message 'Inserted output must not contain LF-only line endings.'

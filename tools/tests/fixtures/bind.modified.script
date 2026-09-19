@@ -1,11 +1,11 @@
 -- Minimal authored bind_stalker.script fixture with unrelated changes.
 function actor_binder:net_spawn(data)
-death_manager.init_drop_settings()
+	death_manager.init_drop_settings()
     repair_dialog.enable() -- unrelated repair mod line
-    soc_sleeping_bag.old_spawn_hook() -- soc_sleeping_bag
+	soc_sleeping_bag.old_spawn_hook() -- soc_sleeping_bag
     loot_tracker.on_spawn() -- loot_tracker
 end
 
 function actor_binder:net_destroy()
-self.bCheckStart = false
+	object_binder.net_destroy(self)
 end

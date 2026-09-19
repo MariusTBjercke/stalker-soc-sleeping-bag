@@ -21,6 +21,40 @@ Enhanced Edition executable `1.10.3+68-42`, Steam build `24067120`.
 - Shared-file integration is limited to marked semantic edits. The deployer
   owns marker insertion, update, and removal under `soc_sleeping_bag`.
 
+### Verified integration literals (build 24067120)
+
+Measured from the clean `resources/configs.db` members (task 6):
+
+- `config/system.ltx` contains `#include "misc\items.ltx"` exactly once, and
+  the user's current loose copy keeps that include exactly once.
+- `scripts/bind_stalker.script` indents body lines with tabs; function
+  signatures start at column 0. The five hook anchors are:
+  - `net_spawn`: after `<TAB>death_manager.init_drop_settings()`
+  - `net_destroy`: after `<TAB>object_binder.net_destroy(self)`. The
+    previously assumed `self.bCheckStart = false` line belongs to
+    `__init`, not `net_destroy`.
+  - `use_inventory_item`: after `<TAB>if(obj) then`
+  - `hit_callback`: before `<TAB>-- MTB-Damian.Romanik [JUD-1117] Start:
+    Make sure who is present`, so a hit with an unknown source still
+    records the recent-hit signal before EE's early return
+  - `update`: after `<TAB>object_binder.update(self, delta)`
+- EE registers `callback.use_object`, `callback.death`, and `callback.hit`
+  in `net_spawn` and clears them in `net_destroy`.
+
+### Verified item presentation provenance
+
+The item definition reuses verified EE-owned assets only:
+
+- Visual `equipments\item_merger.ogf`, taken from the clean
+  `[device_atifact_merger]` section in `config/misc/devices.ltx`.
+- Icon grid `inv_grid_x = 18`, `inv_grid_y = 12`, `inv_grid_width = 1`,
+  `inv_grid_height = 1`, taken from the clean `[antirad]` section, the
+  reference `II_ANTIR` item in `config/misc/items.ltx`.
+- `quest_item = true` is the EE quest-item property used throughout
+  `config/misc/quest_items.ltx`.
+- `[identity_immunities]` is the shared base section inherited by vanilla
+  devices, food, and the bolt; the item inherits no consumable effects.
+
 ## Planned component boundary
 
 Mod-owned Lua, LTX, XML, and localization files contain sleeping-bag

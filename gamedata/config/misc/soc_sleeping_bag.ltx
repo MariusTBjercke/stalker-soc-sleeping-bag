@@ -1,0 +1,36 @@
+;; Sleeping Bag: the reusable inventory item that opens the sleep menu.
+;; Independently authored for this mod. It inherits the same base section as
+;; every vanilla device and uses only verified EE-owned presentation assets:
+;; the merger visual and the antirad icon grid (see docs/ARCHITECTURE.md).
+;; The item is consumed by the engine on use; the gameplay module provisions
+;; a replacement after the menu action finishes.
+
+[soc_sleeping_bag]:identity_immunities
+GroupControlSection		= spawn_group
+$spawn				= "devices\soc_sleeping_bag"
+$prefetch			= 32
+class				= II_ANTIR
+cform				= skeleton
+visual				= equipments\item_merger.ogf
+description			= st_soc_sleeping_bag_desc
+
+inv_name			= st_soc_sleeping_bag_name
+inv_name_short			= st_soc_sleeping_bag_name
+inv_weight			= 1.2
+
+inv_grid_width			= 1
+inv_grid_height			= 1
+inv_grid_x			= 18
+inv_grid_y			= 12
+cost				= 0
+quest_item			= true
+
+; eatable item: every consumable effect is zero, so using the bag never
+; heals, feeds, powers, decontaminates, or intoxicates the actor.
+eat_health			= 0
+eat_satiety			= 0
+eat_power			= 0
+eat_radiation			= 0
+eat_alcohol			= 0
+wounds_heal_perc		= 0
+eat_portions_num		= 1

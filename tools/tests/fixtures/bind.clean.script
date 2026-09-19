@@ -1,25 +1,30 @@
 -- Minimal authored bind_stalker.script fixture for patch-engine tests.
+-- Anchor shapes mirror the verified EE build 24067120 literals.
 function actor_binder:net_spawn(data)
-death_manager.init_drop_settings()
+	death_manager.init_drop_settings()
     local preserved_spawn_state = true
 end
 
 function actor_binder:net_destroy()
-self.bCheckStart = false
+	object_binder.net_destroy(self)
 end
 
 function actor_binder:use_inventory_item(obj)
-local obj_section = obj:section()
+	if(obj) then
+	end
 end
 
 function actor_binder:hit_callback(obj, amount, local_direction, who, bone_index)
-local hitted_by = who and who:id()
+	-- Authored hit guard comment fixture
+	if who == nil then
+		return
+	end
 end
 
 function actor_binder:update(delta)
-object_binder.update(self, delta)
+	object_binder.update(self, delta)
 end
 
 function actor_binder:unrelated()
-death_manager.init_drop_settings()
+	death_manager.init_drop_settings()
 end
