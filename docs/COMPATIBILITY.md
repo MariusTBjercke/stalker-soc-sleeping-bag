@@ -2,7 +2,7 @@
 
 ## Supported build
 
-The current release (`0.1.0`) supports the manual PC Steam installation of
+The current release (`0.1.1`) supports the manual PC Steam installation of
 S.T.A.L.K.E.R.: Shadow of Chornobyl Enhanced Edition, executable
 `1.10.3+68-42`, Steam build `24067120`. This build is verified through the
 measured known-build registry and the deployment record in

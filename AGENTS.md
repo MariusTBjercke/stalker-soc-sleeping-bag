@@ -37,7 +37,7 @@ before changing game behavior.
 | Behavior and constraints | `docs/superpowers/specs/2026-09-18-sleeping-bag-design.md` |
 | Implementation sequence | `docs/superpowers/plans/2026-09-18-sleeping-bag-implementation.md` |
 
-Version 0.1.0 is deployed for testing and packaged in `dist/`. Playtests so
+Version 0.1.1 (translations added to 0.1.0) is packaged in `dist/`; 0.1.0 was the version deployed for testing. Playtests so
 far are logged in `docs/RUNTIME-TESTS.md`; rows not listed as confirmed there
 are still pending. Next: publish the GitHub release (see CONTRIBUTING.md), then
 consider Steam Workshop support.

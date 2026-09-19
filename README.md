@@ -9,7 +9,7 @@ not contain ABC code, textures, XML, or icon atlases.
 
 ## Current status
 
-Version `0.1.0` targets the supported build only: EE executable
+Version `0.1.1` targets the supported build only: EE executable
 `1.10.3+68-42`, Steam build `24067120`. Other builds are not supported until
 verified. Automated checks pass; runtime acceptance evidence is collected in
 [RUNTIME-TESTS](docs/RUNTIME-TESTS.md).

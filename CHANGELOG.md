@@ -2,6 +2,15 @@
 
 All notable changes to this project are documented here.
 
+## 0.1.1 - 2026-09-19
+
+- Translated all sixteen item, menu and refusal strings into Czech, French,
+  German, Hungarian, Italian, Japanese, Korean, Polish, Russian, Spanish,
+  Ukrainian, and Simplified and Traditional Chinese. These locales showed
+  English text before. Words such as Cancel, Rest, Bleeding and Radiation
+  follow the game's own translations of them. The translations were made
+  without review by a native speaker.
+
 ## 0.1.0 - 2026-09-19
 
 First manual-install release candidate for S.T.A.L.K.E.R.: Shadow of
