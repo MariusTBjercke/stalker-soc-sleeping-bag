@@ -36,5 +36,5 @@ before changing game behavior.
 | Behavior and constraints | `docs/superpowers/specs/2026-09-18-sleeping-bag-design.md` |
 | Implementation sequence | `docs/superpowers/plans/2026-09-18-sleeping-bag-implementation.md` |
 
-The next task is Task 5 of
+The next task is Task 6 of
 `docs/superpowers/plans/2026-09-18-sleeping-bag-implementation.md`.
